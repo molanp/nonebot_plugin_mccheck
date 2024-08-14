@@ -1,5 +1,4 @@
 from PIL import Image, ImageDraw, ImageFont
-import json
 import io
 import re
 import ujson as json
