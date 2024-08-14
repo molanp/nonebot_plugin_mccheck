@@ -26,7 +26,7 @@ __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
     description="Minecraft服务器状态查询，支持IPv6",
     type="application",
-    homepage="https://github.com/molanp/nonebot-plugin-mccheck",
+    homepage="https://github.com/molanp/nonebot_plugin_mccheck",
     config=Config,
     usage=f"""
     Minecraft服务器状态查询，支持IPv6
