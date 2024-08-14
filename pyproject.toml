@@ -17,8 +17,8 @@ dependencies = [
 license = { text = "GNU" }
 
 [project.urls]
-homepage = "https://github.com/molanp/nonebot-plugin-mccheck"
-repository = "https://github.com/molanp/nonebot-plugin-mccheck"
+homepage = "https://github.com/molanp/nonebot_plugin_mccheck"
+repository = "https://github.com/molanp/nonebot_plugin_mccheck"
 
 [project.optional-dependencies]
 adapters = [
