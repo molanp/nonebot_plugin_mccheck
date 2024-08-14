@@ -1,0 +1,24 @@
+[project]
+name = "nonebot-plugin-mccheck"
+version = "0.1.0"
+description = "Minecraft服务器状态查询，支持IPv6"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+    { name = "molanp", email = "luotian233@foxmail.com" },
+]
+dependencies = [
+    "pillow>=10.2.0",
+    "nonebot2[fastapi]>=2.2.0",
+    "dnspython>=2.4.0",
+]
+license = { text = "GNU" }
+
+[project.urls]
+homepage = "https://github.com/molanp/nonebot-plugin-mccheck"
+repository = "https://github.com/molanp/nonebot-plugin-mccheck"
+
+[project.optional-dependencies]
+adapters = [
+    "nonebot-adapter-onebot>=2.4.1",
+]
