@@ -10,8 +10,8 @@ from .untils import (
     is_invalid_address,
     ColoredTextImage,
     parse_motd,
-    readInfo
 )
+from .language import lang_data
 from nonebot.log import logger
 from .config import Config
 from .config import config as plugin_config
@@ -53,7 +53,6 @@ __plugin_meta__ = PluginMetadata(
 lang = plugin_config.mcc_language
 if lang == None:
     lang = "zh-cn"
-lang_data = readInfo("language.json")
 
 check = on_command("查服", aliases={'mcheck'}, priority=5, block=True)
 lang_change = on_command("设置语言", aliases={'set_lang'}, priority=5, block=True)

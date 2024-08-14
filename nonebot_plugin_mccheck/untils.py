@@ -9,12 +9,6 @@ dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
 
 dns.resolver.default_resolver.nameservers = ['223.5.5.5', '1.1.1.1']
 
-
-def readInfo(file):
-    with open(os.path.join(os.path.dirname(__file__), file), "r", encoding="utf-8") as f:
-        return json.loads((f.read()).strip())
-
-
 def is_invalid_address(address):
     domain_pattern = r"^(?:(?!_)(?!-)(?!.*--)[a-zA-Z0-9\u4e00-\u9fa5\-_]{1,63}\.?)+[a-zA-Z\u4e00-\u9fa5]{2,}$"
     ipv4_pattern = r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$"
