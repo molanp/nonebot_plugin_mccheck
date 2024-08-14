@@ -20,7 +20,7 @@ import traceback
 import sys
 import base64
 
-__version__ = "0.1.2a"
+__version__ = "0.1.3"
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
