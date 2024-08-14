@@ -1,9 +1,9 @@
-from nonebot import on_command  # type: ignore
-from nonebot.plugin import PluginMetadata  # type: ignore
-from nonebot.params import Arg, CommandArg, ArgPlainText  # type: ignore
-from nonebot.matcher import Matcher  # type: ignore
-from nonebot.exception import FinishedException  # type: ignore
-from nonebot.adapters.onebot.v11 import Message, MessageSegment, GroupMessageEvent, Bot  # type: ignore
+from nonebot import on_command 
+from nonebot.plugin import PluginMetadata 
+from nonebot.params import Arg, CommandArg, ArgPlainText 
+from nonebot.matcher import Matcher 
+from nonebot.exception import FinishedException 
+from nonebot.adapters.onebot.v11 import Message, MessageSegment, GroupMessageEvent, Bot 
 from .data_source import MineStat
 from .untils import (
     resolve_srv,
@@ -20,7 +20,7 @@ import traceback
 import sys
 import base64
 
-__version__ = "0.1.2"
+__version__ = "0.1.2a"
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
