@@ -14,8 +14,7 @@ dependencies = [
     "dnspython>=2.4.0",
     "ujson"
 ]
-include = ["nonebot_plugin_mccheck/font/*"]
-license = { text = "GNU" }
+license = { text = "GPL-3.0" }
 
 [project.urls]
 homepage = "https://github.com/molanp/nonebot_plugin_mccheck"
@@ -24,4 +23,14 @@ repository = "https://github.com/molanp/nonebot_plugin_mccheck"
 [project.optional-dependencies]
 adapters = [
     "nonebot-adapter-onebot>=2.4.1",
+]
+
+[tool.poetry]
+packages = [{ include = "nonebot_plugin_mccheck" }]
+
+[tool.poetry.include]
+files = [
+    "nonebot_plugin_mccheck/font/**/*",
+    "README.md",
+    "LICENSE"
 ]
