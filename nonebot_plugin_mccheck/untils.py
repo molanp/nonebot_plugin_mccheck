@@ -145,6 +145,7 @@ class ColoredTextImage:
         """
         初始化一个用于绘制彩色文本图像的对象。
         """
+        self.text = text
         self.padding = padding
         self.background_color = background_color
         self.font_path = os.path.join(
@@ -156,10 +157,10 @@ class ColoredTextImage:
         self.italic_font_path = os.path.join(
             os.path.dirname(__file__), "font", "Italic.ttf")
         self.font_size = 40
-        width, height = self._calculate_dimensions(text)
-        self.image = Image.new('RGB', (width, height), self.background_color)
-        self.draw = ImageDraw.Draw(self.image)
-        self.draw_text_with_style(text)
+        #width, height = self._calculate_dimensions(text)
+        #self.image = Image.new('RGB', (width, height), self.background_color)
+        #self.draw = ImageDraw.Draw(self.image)
+        #self.draw_text_with_style(text)
 
     def _calculate_dimensions(self, text: str) -> tuple[int, int]:
         """
@@ -213,12 +214,17 @@ class ColoredTextImage:
             return ImageFont.truetype(self.italic_font_path, self.font_size)
         return ImageFont.truetype(self.font_path, self.font_size)
 
-    def draw_text_with_style(self, text: str) -> None:
+    async def draw_text_with_style(self) -> None:
         """
         使用指定样式绘制文本。
 
         :param text: 需要绘制的文本字符串。
         """
+        text = self.text
+        width, height = self._calculate_dimensions(text)
+        self.image = Image.new('RGB', (width, height), self.background_color)
+        self.draw = ImageDraw.Draw(self.image)
+        #self.draw_text_with_style(text)
 
         bold = italic = underline = strikethrough = False
         current_color = (0, 0, 0)
