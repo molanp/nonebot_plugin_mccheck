@@ -20,6 +20,10 @@ def is_invalid_address(address):
 
     return (match_domain is None) and (match_ipv4 is None) and (match_ipv6 is None)
 
+def readInfo(file):
+    with open(os.path.join(os.path.dirname(__file__), file), "r", encoding="utf-8") as f:
+        return json.loads((f.read()).strip())
+
 
 def resolve_srv(ip, port=0):
     try:
