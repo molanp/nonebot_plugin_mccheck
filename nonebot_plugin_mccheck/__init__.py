@@ -20,7 +20,7 @@ import traceback
 import sys
 import base64
 
-__version__ = "0.1.7"
+__version__ = "0.1.8"
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
@@ -50,7 +50,7 @@ __plugin_meta__ = PluginMetadata(
     )
 
 
-lang = plugin_config.mcc_language
+lang = plugin_config.language
 if lang == None:
     lang = "zh-cn"
 
@@ -89,7 +89,7 @@ async def get_info(ip, port):
         srv = resolve_srv(ip, port)
         ms = MineStat(srv[0], int(srv[1]), timeout=1)
         if ms.online:
-            if plugin_config.mcc_type == 0:
+            if plugin_config.type == 0:
                 result = build_result(ms)
                 await send_image_message(result, ms.favicon, ms.favicon_b64)
             else:
