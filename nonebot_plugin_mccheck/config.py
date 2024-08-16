@@ -15,4 +15,4 @@ class Config(BaseModel):
     """MCCheck Config"""
 
 
-config: ScopedConfig = get_plugin_config(Config).status
+config: ScopedConfig = get_plugin_config(Config).mcc

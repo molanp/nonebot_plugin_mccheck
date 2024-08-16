@@ -300,6 +300,7 @@ class ColoredTextImage:
                 i += 1
             y_offset += line_height
             x_offset = 50
+        return self
 
     def save(self, filename: str) -> None:
         """
