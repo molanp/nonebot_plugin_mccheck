@@ -1,13 +1,12 @@
 from PIL import Image, ImageDraw, ImageFont
+from .data_source import MineStat
 import io
 import re
 import ujson as json
 import os
-import dns.resolver
+import asyncio
+import aiodns
 
-dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
-
-dns.resolver.default_resolver.nameservers = ['223.5.5.5', '1.1.1.1']
 
 def is_invalid_address(address):
     domain_pattern = r"^(?:(?!_)(?!-)(?!.*--)[a-zA-Z0-9\u4e00-\u9fa5\-_]{1,63}\.?)+[a-zA-Z\u4e00-\u9fa5]{2,}$"
@@ -24,20 +23,25 @@ def readInfo(file):
     with open(os.path.join(os.path.dirname(__file__), file), "r", encoding="utf-8") as f:
         return json.loads((f.read()).strip())
 
+async def get_mc(ip: str, port: int, timeout=1):
+    ms = await asyncio.to_thread(MineStat(ip, port, timeout = timeout))
+    return ms
 
-def resolve_srv(ip, port=0):
+async def resolve_srv(ip, port=0):
+    resolver = aiodns.DNSResolver()
+    resolver.nameservers = ['223.5.5.5', '1.1.1.1']  
+    
     try:
-        result = dns.resolver.query(
-            '_minecraft._tcp.' + ip, 'SRV', raise_on_no_answer=False)
-
-        for rdata in result:
-            address = str(rdata.target).strip('.')
-            if (port == 0):
+        response = await resolver.query(f'_minecraft._tcp.{ip}', 'SRV')
+            
+        for rdata in response:
+            address = str(rdata.host).strip('.')
+            if port == 0:
                 port = rdata.port
             return [address, port]
-    except dns.resolver.NXDOMAIN:
+    except aiodns.error.DNSError as e:
         pass
-
+    
     return [ip, port]
 
 

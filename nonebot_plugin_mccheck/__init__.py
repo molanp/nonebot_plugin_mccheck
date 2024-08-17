@@ -4,9 +4,9 @@ from nonebot.params import Arg, CommandArg, ArgPlainText
 from nonebot.matcher import Matcher 
 from nonebot.exception import FinishedException 
 from nonebot.adapters.onebot.v11 import Message, MessageSegment, GroupMessageEvent, Bot 
-from .data_source import MineStat
 from .untils import (
     resolve_srv,
+    get_mc,
     is_invalid_address,
     ColoredTextImage,
     parse_motd,
@@ -20,7 +20,7 @@ import traceback
 import sys
 import base64
 
-__version__ = "0.1.8"
+__version__ = "0.1.8fix"
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
@@ -86,8 +86,8 @@ async def get_info(ip, port):
     global bot, event, ms
 
     try:
-        srv = resolve_srv(ip, port)
-        ms = MineStat(srv[0], int(srv[1]), timeout=1)
+        srv = await resolve_srv(ip, port)
+        ms = await get_mc(srv[0], int(srv[1]), timeout=1)
         if ms.online:
             if plugin_config.type == 0:
                 result = build_result(ms)
