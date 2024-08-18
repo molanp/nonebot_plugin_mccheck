@@ -18,6 +18,9 @@ license = { text = "GPL-3.0" }
 homepage = "https://github.com/molanp/nonebot_plugin_mccheck"
 repository = "https://github.com/molanp/nonebot_plugin_mccheck"
 include = ["nonebot_plugin_mccheck/font/**/*"]
+long_description = "Plugin for querying Minecraft servers for Nonebot"
+long_description_content_type = "text/markdown"
+
 
 [tool.poetry.optional-dependencies]
 adapters = [
