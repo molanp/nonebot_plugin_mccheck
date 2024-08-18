@@ -1,10 +1,8 @@
 from PIL import Image, ImageDraw, ImageFont
-from .data_source import MineStat
 import io
 import re
 import ujson as json
 import os
-import asyncio
 import aiodns
 
 
@@ -18,14 +16,6 @@ def is_invalid_address(address):
     match_ipv6 = re.match(ipv6_pattern, address)
 
     return (match_domain is None) and (match_ipv4 is None) and (match_ipv6 is None)
-
-def readInfo(file):
-    with open(os.path.join(os.path.dirname(__file__), file), "r", encoding="utf-8") as f:
-        return json.loads((f.read()).strip())
-
-async def get_mc(ip: str, port: int, timeout=1):
-    ms = await asyncio.to_thread(MineStat(ip, port, timeout = timeout))
-    return ms
 
 async def resolve_srv(ip, port=0):
     resolver = aiodns.DNSResolver()
