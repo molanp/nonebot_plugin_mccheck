@@ -1,6 +1,6 @@
-[project]
+[tool.poetry]
 name = "nonebot-plugin-mccheck"
-version = "0.1.8.1"
+version = "0.1.8.2"
 description = "Minecraft服务器状态查询，支持IPv6"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -15,26 +15,11 @@ dependencies = [
     "ujson"
 ]
 license = { text = "GPL-3.0" }
-
-[project.urls]
 homepage = "https://github.com/molanp/nonebot_plugin_mccheck"
 repository = "https://github.com/molanp/nonebot_plugin_mccheck"
+include = ["nonebot_plugin_mccheck/font/**/*"]
 
-[project.optional-dependencies]
+[tool.poetry.optional-dependencies]
 adapters = [
     "nonebot-adapter-onebot>=2.4.1",
-]
-
-[tool.poetry]
-packages = [
-    { include = "nonebot_plugin_mccheck" },
-    { include = "nonebot_plugin_mccheck.font" }
-]
-
-
-[tool.poetry.include]
-files = [
-    "nonebot_plugin_mccheck/font/**/*",
-    "README.md",
-    "LICENSE"
 ]
