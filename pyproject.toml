@@ -26,7 +26,11 @@ adapters = [
 ]
 
 [tool.poetry]
-packages = [{ include = "nonebot_plugin_mccheck" }]
+packages = [
+    { include = "nonebot_plugin_mccheck" },
+    { include = "nonebot_plugin_mccheck.font" }
+]
+
 
 [tool.poetry.include]
 files = [
