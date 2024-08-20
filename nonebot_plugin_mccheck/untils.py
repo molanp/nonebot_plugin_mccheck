@@ -3,7 +3,8 @@ import io
 import re
 import ujson as json
 import os
-import aiodns
+import asyncio
+import dns.resolver
 
 def readInfo(file):
     with open(os.path.join(os.path.dirname(__file__), file), "r", encoding="utf-8") as f:
@@ -20,24 +21,30 @@ def is_invalid_address(address):
     match_ipv6 = re.match(ipv6_pattern, address)
 
     return (match_domain is None) and (match_ipv4 is None) and (match_ipv6 is None)
+    
 
-async def resolve_srv(ip, port=0):
-    resolver = aiodns.DNSResolver()
-    resolver.nameservers = ['223.5.5.5', '1.1.1.1']  
+async def resolve_srv(ip: str, port: int = 0):
+    result = await asyncio.to_thread(resolve_srv_sync, ip, port)
+    return result
+
+def resolve_srv_sync(ip: str, port: int = 0):
+    resolver = dns.resolver.Resolver()
+    resolver.nameservers = ['223.5.5.5', '1.1.1.1']
     
     try:
-        response = await resolver.query(f'_minecraft._tcp.{ip}', 'SRV')
+        response = resolver.resolve(f'_minecraft._tcp.{ip}', 'SRV')
+        
+        if not response:
+            return [ip, port]
             
         for rdata in response:
-            address = str(rdata.host).strip('.')
+            address = str(rdata.target).rstrip('.')
             if port == 0:
                 port = rdata.port
             return [address, port]
-    except aiodns.error.DNSError as e:
+    except (dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
         pass
-    
     return [ip, port]
-
 
 def parse_motd(json_data):
     """

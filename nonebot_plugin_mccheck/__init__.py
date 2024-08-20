@@ -16,7 +16,6 @@ from nonebot.log import logger
 from .config import Config
 from .config import config as plugin_config
 import re
-import asyncio
 import traceback
 import sys
 import base64
@@ -87,7 +86,8 @@ async def get_info(ip, port):
 
     try:
         srv = await resolve_srv(ip, port)
-        ms = await asyncio.to_thread(MineStat(srv[0], int(srv[1]), timeout = 1))
+        #无法实现异步
+        ms = MineStat(srv[0], int(srv[1]), timeout = 1)
         if ms.online:
             if plugin_config.type == 0:
                 result = build_result(ms)
