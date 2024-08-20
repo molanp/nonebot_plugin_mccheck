@@ -25,7 +25,7 @@ _✨ Minecraft 服务器查询插件 ✨_
 
 Minecraft服务器状态查询，支持IPv6
 
-与[https://github.com/molanp/zhenxun_check_Minecraft/](https://github.com/molanp/zhenxun_check_Minecraft)同步更新
+> 与[https://github.com/molanp/zhenxun_check_Minecraft/](https://github.com/molanp/zhenxun_check_Minecraft)同步更新
 
 ## 💿 安装
 

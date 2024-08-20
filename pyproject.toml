@@ -8,7 +8,7 @@ authors = ["molanp <luotian233@foxmail.com>"]
 license = "GPL-3.0"
 homepage = "https://github.com/molanp/nonebot_plugin_mccheck"
 repository = "https://github.com/molanp/nonebot_plugin_mccheck"
-include = ["nonebot_plugin_mccheck/font/**/*"]
+include = ["nonebot_plugin_mccheck/**/*"]
 
 [tool.poetry.dependencies]
 pillow = "^10.2.0"
@@ -20,7 +20,6 @@ ujson = "^5.0.0"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
-
 
 [tool.poetry.optional-dependencies]
 adapters = [

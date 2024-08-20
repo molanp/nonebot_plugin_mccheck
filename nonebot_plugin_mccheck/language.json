@@ -1,4 +1,4 @@
-lang_data = {
+{
     "zh-cn": {
         "where_ip": "不知道你服务器的IP在哪里，在你心里吗?",
         "where_port": "你看看这是正经端口吗？",

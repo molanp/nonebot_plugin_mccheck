@@ -9,9 +9,9 @@ from .untils import (
     is_invalid_address,
     ColoredTextImage,
     parse_motd,
+    readInfo
 )
 from .data_source import MineStat
-from .language import lang_data
 from nonebot.log import logger
 from .config import Config
 from .config import config as plugin_config
@@ -52,13 +52,12 @@ __plugin_meta__ = PluginMetadata(
 
 
 lang = plugin_config.language
-if lang == None:
-    lang = "zh-cn"
+lang_data = readInfo("language.json")
 
-check = on_command("查服", aliases={'mcheck'}, priority=5, block=True)
-lang_change = on_command("设置语言", aliases={'set_lang'}, priority=5, block=True)
-lang_now = on_command("当前语言", aliases={'lang_now'}, priority=5, block=True)
-lang_list = on_command("语言列表", aliases={'lang_list'}, priority=5, block=True)
+check = on_command("查服", aliases={'mcheck'}, priority=10, block=True)
+lang_change = on_command("设置语言", aliases={'set_lang'}, priority=10, block=True)
+lang_now = on_command("当前语言", aliases={'lang_now'}, priority=10, block=True)
+lang_list = on_command("语言列表", aliases={'lang_list'}, priority=10, block=True)
 
 
 @check.handle()
