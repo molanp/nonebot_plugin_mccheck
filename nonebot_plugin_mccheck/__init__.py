@@ -9,9 +9,9 @@ from .untils import (
     is_invalid_address,
     ColoredTextImage,
     parse_motd,
+    get_mc,
     readInfo
 )
-from .data_source import MineStat
 from nonebot.log import logger
 from .config import Config
 from .config import config as plugin_config
@@ -20,7 +20,7 @@ import traceback
 import sys
 import base64
 
-__version__ = "0.1.10"
+__version__ = "0.1.11"
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
@@ -86,8 +86,7 @@ async def get_info(ip, port):
 
     try:
         srv = await resolve_srv(ip, port)
-        #无法实现异步
-        ms = MineStat(srv[0], int(srv[1]), timeout = 1)
+        ms = await get_mc(srv[0], int(srv[1]), timeout = 1)
         if ms.online:
             if plugin_config.type == 0:
                 result = build_result(ms)
