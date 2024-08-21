@@ -20,7 +20,7 @@ import traceback
 import sys
 import base64
 
-__version__ = "0.1.12"
+__version__ = "0.1.13"
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
@@ -120,8 +120,7 @@ def build_result(ms, text=False):
     status = f'{ms.connection_status}|{lang_data[lang][str(ms.connection_status)]}'
     base_result = (
         f'\n{lang_data[lang]["version"]}'
-        f'{ms.version if text else parse_motd(ms.version)}'
-        f'\n{lang_data[lang]["version"]}{ms.version}'
+        f'{ms.version if text else parse_motd(ms.version + "[#RESET]")}'
         f'\n{lang_data[lang]["slp_protocol"]}{ms.slp_protocol}'
         f'\n{lang_data[lang]["address"]}{ms.address}'
         f'\n{lang_data[lang]["port"]}{ms.port}'
