@@ -60,7 +60,7 @@ lang_list = on_command("语言列表", aliases={'lang_list'}, priority=10, block
 
 
 @check.handle()
-async def handle_first_receive(bot_: Bot, event_: GroupMessageEvent, matcher: Matcher, args: Message = CommandArg()):
+async def handle_first_receive(bot_: Bot, event_: GroupMessageEvent, matcher: Matcher, args: Message = CommandArg()): # type: ignore
     plain_text = args.extract_plain_text()
     if plain_text:
         global bot, event
@@ -69,7 +69,7 @@ async def handle_first_receive(bot_: Bot, event_: GroupMessageEvent, matcher: Ma
 
 
 @check.got("host", prompt="IP?")
-async def handle_host(host_name: str = ArgPlainText("host")):
+async def handle_host(host_name: str = ArgPlainText("host")): # type: ignore
     address, port = parse_host(host_name)
 
     if not str(port).isdigit() or not (0 <= int(port) <= 65535):
@@ -110,8 +110,8 @@ def parse_host(host_name):
     else:
         pattern = r'\[(.+)\](?::(\d+))?$'
         match = re.match(pattern, host_name)
-        address = match.group(1)
-        port = match.group(2) if match.group(2) else 0
+        address = match.group(1) # type: ignore
+        port = match.group(2) if match.group(2) else 0 # type: ignore
 
     return address, port
 
@@ -119,6 +119,8 @@ def parse_host(host_name):
 def build_result(ms, text=False):
     status = f'{ms.connection_status}|{lang_data[lang][str(ms.connection_status)]}'
     base_result = (
+        f'\n{lang_data[lang]["version"]}'
+        f'{ms.version if text else parse_motd(ms.version)}'
         f'\n{lang_data[lang]["version"]}{ms.version}'
         f'\n{lang_data[lang]["slp_protocol"]}{ms.slp_protocol}'
         f'\n{lang_data[lang]["address"]}{ms.address}'
@@ -129,7 +131,7 @@ def build_result(ms, text=False):
     if 'BEDROCK' in str(ms.slp_protocol):
         base_result += f'\n{lang_data[lang]["gamemode"]}{ms.gamemode}'
     if text:
-        motd_part = f'\n{lang_data[lang]["motd"]}{parse_motd(ms.stripped_motd)}'
+        motd_part = f'\n{lang_data[lang]["motd"]}{ms.stripped_motd}'
     else:
         motd_part = f'\n{lang_data[lang]["motd"]}{parse_motd(ms.motd)}[#RESET]'
 
