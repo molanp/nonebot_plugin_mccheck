@@ -11,7 +11,7 @@ _✨ Minecraft 服务器查询插件 ✨_
 
 
 <a href="./LICENSE">
-    <img src="https://img.shields.io/github/license/molanp/nonebot-plugin-mccheck.svg" alt="license">
+    <img src="https://img.shields.io/github/license/molanp/nonebot_plugin_mccheck.svg" alt="license">
 </a>
 <a href="https://pypi.python.org/pypi/nonebot-plugin-mccheck">
     <img src="https://img.shields.io/pypi/v/nonebot-plugin-mccheck.svg" alt="pypi">
