@@ -95,7 +95,7 @@ conda install nonebot-plugin-mccheck
 ![pic](https://github.com/user-attachments/assets/abcda34f-0783-4c1e-b5c1-de9228047a69)
 
 HTML消息
-![html](https://github.com/user-attachments/assets/3b7eb913-21a2-4c60-b5a7-6311519b6429)
+![html](https://github.com/user-attachments/assets/d0ecffa1-672d-4936-a404-2e12e964ec1e)
 
 ## ⚙️ 配置
 
