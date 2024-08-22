@@ -17,7 +17,7 @@ _✨ Minecraft 服务器查询插件 ✨_
     <img src="https://img.shields.io/pypi/v/nonebot-plugin-mccheck.svg" alt="pypi">
 </a>
 <img src="https://img.shields.io/badge/python-3.9+-blue.svg" alt="python">
-
+<img src="https://img.shields.io/pypi/dm/nonebot-plugin-mccheck" alt="pypi-download-count">
 </div>
 
 
