@@ -63,6 +63,7 @@ conda install nonebot-plugin-mccheck
 
 ## 已实现的功能
 
+- [x] 适配Unicode全字体与字形
 - [x] 渲染Motd样式
 - [x] 查询服务器昵称
 - [x] 查询服务器最大人数,当前人数
@@ -90,7 +91,13 @@ conda install nonebot-plugin-mccheck
 
 ## 效果图
 
-![awa](https://github.com/user-attachments/assets/abcda34f-0783-4c1e-b5c1-de9228047a69)
+v1.9
+
+图片消息
+![1.9 pic](https://github.com/user-attachments/assets/abcda34f-0783-4c1e-b5c1-de9228047a69)
+
+HTML消息
+![1.9 html](https://github.com/user-attachments/assets/3b7eb913-21a2-4c60-b5a7-6311519b6429)
 
 ## ⚙️ 配置
 
@@ -99,7 +106,7 @@ conda install nonebot-plugin-mccheck
 | 配置项 | 必填 | 默认值 | 说明 |
 |:-----:|:----:|:----:|:----:|
 | `MCC__LANGUAGE` | 否 | `zh-cn` | 插件渲染图片所使用的语言<br>可用语言:[`zh-cn`,`zh-tw`,`en`] |
-| `MCC__TYPE` | 否 | `0` | 插件发送的消息类型(`0`为图片, `1`为文本) |
+| `MCC__TYPE` | 否 | `0` | 插件发送的消息类型(`0`为HTML, `1`为图片, `2`为文本) |
 
 ## 🎉 使用
 |命令|参数|范围|说明|
