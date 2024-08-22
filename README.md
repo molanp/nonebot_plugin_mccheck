@@ -20,6 +20,7 @@ _✨ Minecraft 服务器查询插件 ✨_
 <img src="https://img.shields.io/pypi/dm/nonebot-plugin-mccheck" alt="pypi-download-count">
 </div>
 
+简体中文|[English](README_en.md)
 
 ## 📖 介绍
 
@@ -56,12 +57,12 @@ conda install nonebot-plugin-mccheck
 ```
 
 打开 nonebot2 项目根目录下的 `pyproject.toml` 文件, 在 `[tool.nonebot]` 部分追加写入
-
-    plugins = ["nonebot_plugin_mccheck"]
-
+```toml
+    plugin["nonebot_plugin_mccheck"]
+```
 </details>
 
-## 已实现的功能
+## 📈 已实现的功能
 
 - [x] 适配Unicode全字体与字形
 - [x] 渲染Motd样式
@@ -83,13 +84,13 @@ conda install nonebot-plugin-mccheck
 - [x] 多语言
 - [x] SRV支持
 
-## 未来的功能
+## 📑 未来的功能
 
 - [ ] 获取服务器协议号
 - [ ] 获取服务器官网[如果存在]
 - [ ] 敬请期待
 
-## 效果图
+## 🖼️ 效果图
 
 图片消息
 ![pic](https://github.com/user-attachments/assets/abcda34f-0783-4c1e-b5c1-de9228047a69)
@@ -107,6 +108,7 @@ HTML消息
 | `MCC__TYPE` | 否 | `0` | 插件发送的消息类型(`0`为HTML, `1`为图片, `2`为文本) |
 
 ## 🎉 使用
+
 |命令|参数|范围|说明|
 |:---:|:---:|:---:|:---:|
 |`查服/mcheck`|`[ip]:[端口]` 或 `[ip]`|私聊/群聊|查询服务器状态|
