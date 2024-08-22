@@ -22,11 +22,11 @@ import traceback
 import sys
 import base64
 
-__version__ = "0.1.13"
+__version__ = "0.1.14"
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
-    description="Minecraft服务器状态查询，支持IPv6",
+    description="Minecraft服务器状态查询，支持IPv6/Minecraft server status query, IPv6 supported",
     type="application",
     homepage="https://github.com/molanp/nonebot_plugin_mccheck",
     config=Config,
@@ -37,7 +37,7 @@ __plugin_meta__ = PluginMetadata(
         设置语言 zh-cn
         当前语言
         语言列表
-    eg:
+    usage:
         mcheck ip:port / mcheck ip
         set_lang en
         lang_now
@@ -56,10 +56,10 @@ message_type = plugin_config.type
 lang = plugin_config.language
 lang_data = readInfo("language.json")
 
-check = on_command("查服", aliases={'mcheck'}, priority=5, block=True)
-lang_change = on_command("设置语言", aliases={'set_lang'}, priority=5, block=True)
-lang_now = on_command("当前语言", aliases={'lang_now'}, priority=5, block=True)
-lang_list = on_command("语言列表", aliases={'lang_list'}, priority=5, block=True)
+check = on_command("查服", aliases={'mcheck'}, priority=10, block=True)
+lang_change = on_command("设置语言", aliases={'set_lang'}, priority=10, block=True)
+lang_now = on_command("当前语言", aliases={'lang_now'}, priority=10, block=True)
+lang_list = on_command("语言列表", aliases={'lang_list'}, priority=10, block=True)
 
 
 @check.handle()
@@ -167,10 +167,10 @@ async def send_message(type, result, favicon, favicon_b64):
 
 
 async def send_text_message(result, favicon, favicon_b64):
-    if favicon is not None and favicon != "":
+    if favicon is not None:
         await check.finish(Message([
             Message(result),
-            MessageSegment.text('favicon:'),
+            MessageSegment.text('Favicon:'),
             MessageSegment.image(base64.b64decode(favicon_b64.split(",")[1]))
         ]), at_sender=True)
     else:
