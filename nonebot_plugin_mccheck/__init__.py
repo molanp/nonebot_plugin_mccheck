@@ -23,7 +23,7 @@ import sys
 import base64
 
 
-__version__ = "0.1.17"
+__version__ = "0.1.18"
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
