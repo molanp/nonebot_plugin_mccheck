@@ -49,7 +49,7 @@ __plugin_meta__ = PluginMetadata(
         "author": "molanp <luotian233@foxmail.com>",
         "version": __version__,
     },
-    )
+)
 
 
 message_type = plugin_config.type
