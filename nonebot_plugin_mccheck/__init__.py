@@ -1,6 +1,8 @@
+from nonebot import require
 from nonebot.log import logger  # type: ignore
 from nonebot.plugin import PluginMetadata  # type: ignore
 from nonebot.exception import FinishedException  # type: ignore
+require("nonebot_plugin_alconna")
 from nonebot_plugin_alconna import Alconna, Args, on_alconna, Match, UniMessage  # type: ignore
 from nonebot_plugin_alconna.uniseg import Text, Image  # type: ignore
 from .config import config as plugin_config
