@@ -12,7 +12,7 @@ include = ["nonebot_plugin_mccheck/**/*"]
 keywords = ["nonebot", "nonebot2", "minecraft", "i18n", "inquire"]
 
 [tool.poetry.dependencies]
-nonebot-plugin-alconna = "^0.37.0",
+nonebot-plugin-alconna = "^0.37.0"
 pillow = "^10.2.0"
 nonebot2 = "^2.2.0"
 dnspython = "^2.5.0"
