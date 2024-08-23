@@ -15,7 +15,6 @@ keywords = ["nonebot", "nonebot2", "minecraft", "i18n", "inquire"]
 nonebot-plugin-alconna = "^0.37.0",
 pillow = "^10.2.0"
 nonebot2 = "^2.2.0"
-nonebot-adapter-onebot = "^2.4.1"
 dnspython = "^2.5.0"
 ujson = "^5.0.0"
 
