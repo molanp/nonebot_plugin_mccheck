@@ -2,9 +2,12 @@ from nonebot import require
 from nonebot.log import logger  # type: ignore
 from nonebot.plugin import PluginMetadata  # type: ignore
 from nonebot.exception import FinishedException  # type: ignore
+from arclet.alconna import (
+    Args,
+    Alconna,
+)
 require("nonebot_plugin_alconna")
-from nonebot_plugin_alconna import Alconna, Args, on_alconna, Match, UniMessage  # type: ignore
-from nonebot_plugin_alconna.uniseg import Text, Image  # type: ignore
+from nonebot_plugin_alconna import  on_alconna, Match, UniMessage, Text, Image  # type: ignore
 from .config import config as plugin_config
 from .config import Config
 from .untils import (
@@ -23,7 +26,7 @@ import sys
 import base64
 
 
-__version__ = "0.1.18"
+__version__ = "0.1.19"
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
