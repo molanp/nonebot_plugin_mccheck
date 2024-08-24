@@ -64,6 +64,7 @@ conda install nonebot-plugin-mccheck
 
 ## 📈 已实现的功能
 
+- [x] 支持全平台适配器
 - [x] 适配Unicode全字体与字形
 - [x] 渲染Motd样式
 - [x] 查询服务器昵称

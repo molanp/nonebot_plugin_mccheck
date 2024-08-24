@@ -62,6 +62,7 @@ plugins = ["nonebot_plugin_mccheck"]
 
 ## 📈 Implemented functions
 
+- [x] Full platform adapter support
 - [x] Adapted unicode full fonts and glyphs
 - [x] Render Motd styles
 - [x] Query server nickname
