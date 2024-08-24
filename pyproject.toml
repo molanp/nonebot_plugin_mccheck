@@ -13,6 +13,7 @@ keywords = ["nonebot", "nonebot2", "minecraft", "i18n", "inquire"]
 
 [tool.poetry.dependencies]
 nonebot-plugin-alconna = "^0.48.0"
+nonebot-plugin-htmlrender = "^0.3.5"
 pillow = "^10.2.0"
 nonebot2 = "^2.2.0"
 dnspython = "^2.5.0"
