@@ -16,10 +16,10 @@ from .config import Config
 from .config import config as plugin_config
 from nonebot import require
 require("nonebot_plugin_alconna")
-from nonebot_plugin_alconna import on_alconna, Match, UniMessage, Text, Image  # type: ignore
-from nonebot.log import logger  # type: ignore
-from nonebot.plugin import PluginMetadata  # type: ignore
-from nonebot.exception import FinishedException  # type: ignore
+from nonebot_plugin_alconna import on_alconna, Match, UniMessage, Text, Image
+from nonebot.log import logger
+from nonebot.plugin import PluginMetadata
+from nonebot.exception import FinishedException
 from arclet.alconna import (
     Args,
     Alconna,
