@@ -5,6 +5,7 @@ import ujson as json
 import os
 import asyncio
 import dns.resolver
+import base64
 from .data_source import MineStat
 
 
@@ -12,6 +13,14 @@ def readInfo(file: str) -> dict:
     with open(os.path.join(os.path.dirname(__file__), file), "r", encoding="utf-8") as f:
         return json.loads((f.read()).strip())
 
+def is_image_valid(image_data):
+    try:
+        image_bytes = io.BytesIO(base64.b64decode(image_data))
+        image = Image.open(image_bytes)
+        image.verify()
+        return True
+    except (IOError, SyntaxError) as e:
+        return False
 
 def create_mine_stat(host: str, port: int, timeout: int) -> MineStat:
     ms = MineStat(host, port, timeout)

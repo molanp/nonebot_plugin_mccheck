@@ -10,7 +10,8 @@ from .untils import (
     readInfo,
     get_mc,
     parse_host,
-    resolve_srv
+    resolve_srv,
+    is_image_valid
 )
 from .config import Config
 from .config import config as plugin_config
@@ -26,7 +27,7 @@ from arclet.alconna import (
 )
 
 
-__version__ = "0.1.20"
+__version__ = "0.1.21"
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
@@ -128,7 +129,7 @@ async def build_result(ms, type=0):
     status = f'{ms.connection_status}|{lang_data[lang][str(ms.connection_status)]}'
     if type == 0:
         return {
-            "favicon": ms.favicon_b64 if ms.favicon_b64 is not None and ms.favicon_b64 != "" else "no_favicon.png",
+            "favicon": ms.favicon_b64 if is_image_valid(ms.favicon_b64) else "no_favicon.png",
             "version": await parse_motd_to_html(ms.version),
             "slp_protocol": str(ms.slp_protocol),
             "address": ms.address,
