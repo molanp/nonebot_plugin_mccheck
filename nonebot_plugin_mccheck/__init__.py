@@ -21,6 +21,7 @@ from nonebot_plugin_alconna import on_alconna, Match, UniMessage, Text, Image
 from nonebot.log import logger
 from nonebot.plugin import PluginMetadata
 from nonebot.exception import FinishedException
+from dns.resolver import LifetimeTimeout
 from arclet.alconna import (
     Args,
     Alconna,
@@ -100,10 +101,10 @@ async def handle_check(host: str):
     address, port = await parse_host(host)
 
     if not str(port).isdigit() or not (0 <= int(port) <= 65535):
-        await check.finish(Text(f' {lang_data[lang]["where_port"]}'), reply_to=True)
+        await check.finish(Text(f'{lang_data[lang]["where_port"]}'), reply_to=True)
 
     if await is_invalid_address(address):
-        await check.finish(Text(f' {lang_data[lang]["where_ip"]}'), reply_to=True)
+        await check.finish(Text(f'{lang_data[lang]["where_ip"]}'), reply_to=True)
 
     await get_info(address, port)
 
@@ -118,9 +119,11 @@ async def get_info(ip, port):
             result = build_result(ms, message_type)
             await send_message(message_type, result, ms.favicon, ms.favicon_b64)
         else:
-            await check.finish(Text(f' {lang_data[lang][str(ms.connection_status)]}'), reply_to=True)
+            await check.finish(Text(f'{lang_data[lang][str(ms.connection_status)]}'), reply_to=True)
     except FinishedException:
         pass
+    except LifetimeTimeout:
+        await check.finish(Text(f'{lang_data[lang]["dns_fail"]}'), reply_to=True)
     except BaseException as e:
         await handle_exception(e)
 
