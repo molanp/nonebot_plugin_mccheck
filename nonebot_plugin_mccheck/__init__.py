@@ -28,7 +28,7 @@ from arclet.alconna import (
 )
 
 
-__version__ = "0.1.21"
+__version__ = "0.1.22"
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
