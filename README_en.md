@@ -91,12 +91,19 @@ plugins = ["nonebot_plugin_mccheck"]
 
 ## 🖼️ Test screenshot
 
-Picture Message
-![pic](https://github.com/user-attachments/assets/abcda34f-0783-4c1e-b5c1-de9228047a69)
+v0.1.22
 
-HTML Message
-![html](https://github.com/user-attachments/assets/18069f2a-4f7e-4994-837b-2b9e0cbf1f74)
+Text message
+![0.1.22 text](https://github.com/user-attachments/assets/7099ded9-9c8c-482f-89e5-a68bd014e67a)
 
+Picture message
+![0.1.22 pic](https://github.com/user-attachments/assets/3ba422a4-bc41-4401-85c7-f5da2f693b03)
+
+HTML message
+![0.1.22 html](https://github.com/user-attachments/assets/09396694-16a4-4907-8b25-3863b181a725)
+
+Geyser server double check(More than just HTML messages are supported, only one is shown here)
+![0.1.22 geyser](https://github.com/user-attachments/assets/3982c18a-7cc5-4eb2-9f0f-9ec2a16fed2f)
 ## ⚙️ Configuration
 
 Add the required configuration in the following table to the `.env` file of the nonebot2 project.
