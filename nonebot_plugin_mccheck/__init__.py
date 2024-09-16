@@ -14,7 +14,7 @@ from nonebot_plugin_alconna import on_alconna, Match, UniMessage, Text
 from nonebot.plugin import PluginMetadata
 from arclet.alconna import Args, Alconna
 
-__version__ = "0.1.22"
+__version__ = "0.1.23"
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
