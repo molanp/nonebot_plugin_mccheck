@@ -14,8 +14,6 @@ from nonebot_plugin_alconna import on_alconna, Match, UniMessage, Text
 from nonebot.plugin import PluginMetadata
 from arclet.alconna import Args, Alconna
 
-__version__ = "0.1.23"
-
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
     description="Minecraft服务器状态查询，支持IPv6/Minecraft server status query, IPv6 supported",
@@ -36,8 +34,7 @@ __plugin_meta__ = PluginMetadata(
         lang_list
     """.strip(),
     extra={
-        "author": "molanp <luotian233@foxmail.com>",
-        "version": __version__,
+        "author": "molanp <luotian233@foxmail.com>"
     },
 )
 
