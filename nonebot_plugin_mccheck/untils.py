@@ -118,7 +118,7 @@ async def build_result(ms, type=0):
         else:
             return [Text(result)]
 
-async def get_mc(host: str, port: int, timeout: int = 5) -> List[Tuple[Optional[MineStat], ConnStatus]]:
+async def get_mc(host: str, port: int, timeout: int = 5) -> List[Tuple[Optional[MineStat], Optional[ConnStatus]]]:
     """
     获取Java版和Bedrock版的MC服务器信息。
 
@@ -136,13 +136,24 @@ async def get_mc(host: str, port: int, timeout: int = 5) -> List[Tuple[Optional[
     ]
 
 
-async def get_message_list(ip, port) -> list:
+async def get_message_list(ip: str, port: int, timeout: int = 5) -> list:
+    """
+    异步函数，根据IP和端口获取消息列表。
+
+    参数:
+    - ip (str): 服务器的IP地址。
+    - port (int): 服务器的端口。
+    - timeout (int, 可选): 超时时间，默认为5秒。
+
+    返回:
+    - list: 包含消息的列表。
+    """
     try:
         srv = await resolve_srv(ip, port)
     except dns.resolver.LifetimeTimeout:
         return [Text(f"{lang_data[lang]['dns_fail']}")]
     messages = []
-    ms = await get_mc(srv[0], int(srv[1]), timeout=5)
+    ms = await get_mc(srv[0], int(srv[1]), timeout)
     for i in ms:
         if i[0] is not None:
             messages.append(await build_result(i[0], message_type))
@@ -152,7 +163,7 @@ async def get_message_list(ip, port) -> list:
     return messages
 
 
-async def get_bedrock(host: str, port: int, timeout: int = 5) -> Tuple[Optional[MineStat], ConnStatus]:
+async def get_bedrock(host: str, port: int, timeout: int = 5) -> Tuple[Optional[MineStat], Optional[ConnStatus]]:
     """
     异步函数，用于通过指定的主机名、端口和超时时间获取Minecraft Bedrock版服务器状态。
 
@@ -164,26 +175,15 @@ async def get_bedrock(host: str, port: int, timeout: int = 5) -> Tuple[Optional[
     返回:
     - MineStat实例，包含服务器状态信息，如果服务器在线的话；否则可能返回None。
     """
-    result = None
-    msg = ConnStatus.CONNFAIL
+    result = MineStat(host, port, timeout, SlpProtocols.BEDROCK_RAKNET)
 
-    async def check_protocol():
-        nonlocal result, msg
-        ms = MineStat(host, port, timeout, SlpProtocols.BEDROCK_RAKNET)
-        if ms.online:
-            result = ms
-        else:
-            msg = ms.connection_status
-
-    await check_protocol()
-
-    if result is None:
-        return None, msg
+    if result.online:
+        return result, ConnStatus.SUCCESS
     else:
-        return result, result.connection_status
+        return None, result.connection_status
 
 
-async def get_java(host: str, port: int, timeout: int = 5) -> Tuple[Optional[MineStat], ConnStatus]:
+async def get_java(host: str, port: int, timeout: int = 5) -> Tuple[Optional[MineStat], Optional[ConnStatus]]:
     """
     异步函数，用于通过指定的主机名、端口和超时时间获取Minecraft Java版服务器状态。
 
@@ -195,30 +195,25 @@ async def get_java(host: str, port: int, timeout: int = 5) -> Tuple[Optional[Min
     返回:
     - MineStat 实例，包含服务器状态信息，如果服务器在线的话；否则可能返回 None。
     """
-    result = None
-    msg = ConnStatus.CONNFAIL
+    # Minecraft 1.4 & 1.5 (legacy SLP)
+    result = MineStat(host, port, timeout, SlpProtocols.LEGACY)
 
-    async def check_protocol():
-        nonlocal result, msg
-        for protocol in [
-        SlpProtocols.BETA,
-        SlpProtocols.EXTENDED_LEGACY,
-        SlpProtocols.JSON,
-        SlpProtocols.LEGACY,
-        SlpProtocols.QUERY
-        ]:
-           ms = MineStat(host, port, timeout, protocol)
-           if ms.online:
-              result = ms
-           elif ms.connection_status != ConnStatus.CONNFAIL and msg == ConnStatus.CONNFAIL:
-                 msg = ms.connection_status
+    # Minecraft Beta 1.8 to Release 1.3 (beta SLP)
+    if result.connection_status not in [ConnStatus.CONNFAIL, ConnStatus.SUCCESS]:
+        result = MineStat(host, port, timeout, SlpProtocols.BETA)
 
-    await check_protocol()
+    # Minecraft 1.6 (extended legacy SLP)
+    if result.connection_status is not ConnStatus.CONNFAIL:
+        result = MineStat(host, port, timeout, SlpProtocols.EXTENDED_LEGACY)
 
-    if not result:
-        return None, msg
+    # Minecraft 1.7+ (JSON SLP)
+    if result.connection_status is not ConnStatus.CONNFAIL:
+        result = MineStat(host, port, timeout, SlpProtocols.JSON)
+
+    if result.online:
+        return result, ConnStatus.SUCCESS
     else:
-        return result, result.connection_status
+        return None, result.connection_status
 
 
 async def parse_host(host_name) -> Tuple[str, int]:
@@ -392,9 +387,10 @@ async def parse_motd(json_data: Optional[str]) -> Optional[str]:
     async def parse_extra(extra):
         result = ""
         if isinstance(extra, dict) and "extra" in extra:
-            if isinstance(extra, dict) and "text" in extra and extra["text"] != "":
-                result += "[#RESET]" + await parse_extra(extra["text"]) 
-            result += await parse_extra(extra["extra"])
+            if "extra" in extra:
+                result += await parse_extra(extra["extra"])
+            if "text" in extra:
+                result += await parse_extra(extra["text"])
         elif isinstance(extra, dict):
             color = extra.get("color", "")
             text = extra.get("text", "")
@@ -489,9 +485,10 @@ async def parse_motd_to_html(json_data: Optional[str]) -> Optional[str]:
     async def parse_extra(extra, styles=[]):
         result = ""
         if isinstance(extra, dict) and "extra" in extra:
-            if isinstance(extra, dict) and "text" in extra and extra["text"] != "":
+            if "extra" in extra:
+                result += await parse_extra(extra["extra"], styles)
+            if "text" in extra:
                 result += await parse_extra(extra["text"], styles)
-            result += await parse_extra(extra["extra"], styles)
         elif isinstance(extra, dict):
             color = extra.get("color", "")
             text = extra.get("text", "")
