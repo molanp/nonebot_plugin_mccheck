@@ -2,14 +2,12 @@ import io
 import re
 import ujson
 import os
-import asyncio
 import dns.resolver
 import base64
 import sys
 import traceback
 from nonebot.log import logger
 from .data_source import MineStat, SlpProtocols, ConnStatus
-from dns.resolver import LifetimeTimeout
 from .configs import lang_data, lang, message_type
 from PIL import Image, ImageDraw, ImageFont
 from typing import Optional, Tuple, List
@@ -141,7 +139,7 @@ async def get_mc(host: str, port: int, timeout: int = 5) -> List[Tuple[Optional[
 async def get_message_list(ip, port) -> list:
     try:
         srv = await resolve_srv(ip, port)
-    except LifetimeTimeout:
+    except dns.resolver.LifetimeTimeout:
         return [Text(f"{lang_data[lang]['dns_fail']}")]
     messages = []
     ms = await get_mc(srv[0], int(srv[1]), timeout=5)
@@ -166,22 +164,18 @@ async def get_bedrock(host: str, port: int, timeout: int = 5) -> Tuple[Optional[
     返回:
     - MineStat实例，包含服务器状态信息，如果服务器在线的话；否则可能返回None。
     """
-    result_event = asyncio.Event()
     result = None
     msg = ConnStatus.CONNFAIL
 
-    async def callback():
+    async def check_protocol():
         nonlocal result, msg
         ms = MineStat(host, port, timeout, SlpProtocols.BEDROCK_RAKNET)
         if ms.online:
             result = ms
-        elif ms.connection_status != ConnStatus.CONNFAIL:
+        else:
             msg = ms.connection_status
-        result_event.set()
 
-    task = asyncio.create_task(callback())
-
-    await result_event.wait()
+    await check_protocol()
 
     if result is None:
         return None, msg
@@ -201,30 +195,25 @@ async def get_java(host: str, port: int, timeout: int = 5) -> Tuple[Optional[Min
     返回:
     - MineStat 实例，包含服务器状态信息，如果服务器在线的话；否则可能返回 None。
     """
-    result_event = asyncio.Event()
     result = None
     msg = ConnStatus.CONNFAIL
 
-    async def check_protocol(protocol):
+    async def check_protocol():
         nonlocal result, msg
-        ms = MineStat(host, port, timeout, protocol)
-        if ms.online:
-            result = ms
-            result_event.set()
-        elif ms.connection_status != ConnStatus.CONNFAIL and msg == ConnStatus.CONNFAIL:
-            msg = ms.connection_status
-
-    tasks = [check_protocol(protocol) for protocol in [
+        for protocol in [
         SlpProtocols.BETA,
         SlpProtocols.EXTENDED_LEGACY,
         SlpProtocols.JSON,
         SlpProtocols.LEGACY,
         SlpProtocols.QUERY
-    ]]
+        ]:
+           ms = MineStat(host, port, timeout, protocol)
+           if ms.online:
+              result = ms
+           elif ms.connection_status != ConnStatus.CONNFAIL and msg == ConnStatus.CONNFAIL:
+                 msg = ms.connection_status
 
-    await asyncio.gather(*tasks)
-
-    await result_event.wait()
+    await check_protocol()
 
     if not result:
         return None, msg
