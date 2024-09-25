@@ -41,7 +41,7 @@ __plugin_meta__ = PluginMetadata(
 check = on_alconna(
     Alconna("mcheck", Args["host?", str]),
     aliases={"查服"},
-    priority=5,
+    priority=10,
     block=True,
 )
 
@@ -49,21 +49,21 @@ check = on_alconna(
 lang_change = on_alconna(
     Alconna("set_lang", Args["language", str]),
     aliases={"设置语言"},
-    priority=5,
+    priority=10,
     block=True,
 )
 
 lang_now = on_alconna(
     Alconna("lang_now"),
     aliases={"当前语言"},
-    priority=5,
+    priority=10,
     block=True,
 )
 
 lang_list = on_alconna(
     Alconna("lang_list"),
     aliases={"语言列表"},
-    priority=5,
+    priority=10,
     block=True,
 )
 
