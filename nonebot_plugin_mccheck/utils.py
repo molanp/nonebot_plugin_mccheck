@@ -569,7 +569,7 @@ async def parse_motd_to_html(json_data: Optional[str]) -> Optional[str]:
             # 处理换行符
             if json_data[i:i+2] == "\n":
                 result += "<br>"
-                i += 1
+                i += 2
                 continue
             result += json_data[i]
             i += 1
