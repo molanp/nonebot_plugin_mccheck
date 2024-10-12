@@ -113,6 +113,13 @@ Add the required configuration in the following table to the `.env` file of the 
 | `MCC__LANGUAGE` | False | `zh-cn` | Languages used by the plugin to render images<br>Available languages: [`zh-cn`,`zh-tw`,`en`] |
 | `MCC__TYPE` | False | `0` | The type of message the plugin sends (`0` for HTML, `1` for image, `2` for text) |
 
+## 🎲 Comparison of message types
+
+| Type | Special Styles | Favicon | Colored underline/strikethrough | Full Unicode font support |
+|:-----:|:-----:|:-----:|:-----:|:-----:|
+| Text | ❌ | ⭕ | ❌ | ⭕ |
+| Picture | ⭕ | ⭕ | ⭕ | ❌ |
+| HTML | ⭕ | ⭕ | ❌ | ⭕ |
 
 ## 🎉 Usage
 | Command | Parameter | Scope | Description |
