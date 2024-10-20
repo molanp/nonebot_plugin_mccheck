@@ -85,6 +85,7 @@ plugins = ["nonebot_plugin_mccheck"]
 
 ## 📑 Future functions
 
+- [ ] Fully colored underlined/strikethrough
 - [ ] Get server protocol number
 - [ ] Get server official website (if any)
 - [ ] And more...
@@ -115,7 +116,7 @@ Add the required configuration in the following table to the `.env` file of the 
 
 ## 🎲 Comparison of message types
 
-| Type | Special Styles | Favicon | Colored underline/strikethrough | Full Unicode font support |
+| Type | Special Styles | Favicon | Fully colored underline/strikethrough | Full Unicode font support |
 |:-----:|:-----:|:-----:|:-----:|:-----:|
 | Text | ❌ | ⭕ | ❌ | ⭕ |
 | Picture | ⭕ | ⭕ | ⭕ | ❌ |
