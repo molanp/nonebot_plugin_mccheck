@@ -82,10 +82,10 @@ plugins = ["nonebot_plugin_mccheck"]
 - [x] Query server favicon
 - [x] Multilingual
 - [x] SRV support 
+- [x] Fully colored underlined/strikethrough
 
 ## 📑 Future functions
 
-- [ ] Fully colored underlined/strikethrough
 - [ ] Get server protocol number
 - [ ] Get server official website (if any)
 - [ ] And more...
@@ -120,7 +120,7 @@ Add the required configuration in the following table to the `.env` file of the 
 |:-----:|:-----:|:-----:|:-----:|:-----:|
 | Text | ❌ | ⭕ | ❌ | ⭕ |
 | Picture | ⭕ | ⭕ | ⭕ | ❌ |
-| HTML | ⭕ | ⭕ | ❌ | ⭕ |
+| HTML | ⭕ | ⭕ | ⭕ | ⭕ |
 
 ## 🎉 Usage
 | Command | Parameter | Scope | Description |
