@@ -6,12 +6,11 @@ import os
 import dns.resolver
 import base64
 import traceback
-from zhenxun.services.log import logger # type: ignore
 from .data_source import MineStat, SlpProtocols, ConnStatus
 from .configs import lang_data, lang, message_type
 from PIL import Image, ImageDraw, ImageFont
 from typing import Optional, Tuple, List
-from nonebot import require
+from nonebot import require, logger
 
 require("nonebot_plugin_alconna")
 from nonebot_plugin_alconna import Text  # type: ignore # noqa: E402
