@@ -4,15 +4,15 @@ from .utils import (
     get_message_list,
     parse_host,
     change_language_to,
-    handle_exception
+    handle_exception,
 )
 from nonebot.plugin import PluginMetadata
 from .config import Config
 from nonebot import require
+
 require("nonebot_plugin_alconna")
-from nonebot_plugin_alconna import on_alconna, Match, UniMessage, Text
-from nonebot.plugin import PluginMetadata
-from arclet.alconna import Args, Alconna
+from nonebot_plugin_alconna import on_alconna, Match, UniMessage, Text  # type: ignore # noqa: E402
+from arclet.alconna import Args, Alconna  # type: ignore # noqa: E402
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
@@ -20,7 +20,7 @@ __plugin_meta__ = PluginMetadata(
     type="application",
     homepage="https://github.com/molanp/nonebot_plugin_mccheck",
     config=Config,
-    usage=f"""
+    usage="""
     Minecraft服务器状态查询，支持IPv6
     用法：
         查服 [ip]:[端口] / 查服 [ip]
@@ -33,9 +33,7 @@ __plugin_meta__ = PluginMetadata(
         lang_now
         lang_list
     """.strip(),
-    extra={
-        "author": "molanp <luotian233@foxmail.com>"
-    },
+    extra={"author": "molanp <luotian233@foxmail.com>"},
 )
 
 check = on_alconna(
@@ -100,18 +98,21 @@ async def get_info(ip, port):
     except BaseException as e:
         await check.send(await handle_exception(e), reply_to=True)
 
+
 @lang_change.handle()
 async def _(language: str):
     if language:
         await lang_change.send(Text(await change_language_to(language)), reply_to=True)
     else:
         await lang_change.send(Text("Language?"), reply_to=True)
+
+
 @lang_now.handle()
 async def _():
-    await lang_now.send(Text(f'Language: {lang}.'), reply_to=True)
+    await lang_now.send(Text(f"Language: {lang}."), reply_to=True)
 
 
 @lang_list.handle()
 async def _():
-    i = '\n'.join(list(lang_data.keys()))
+    i = "\n".join(list(lang_data.keys()))
     await lang_list.send(Text(f"Language List:\n{i}"), reply_to=True)

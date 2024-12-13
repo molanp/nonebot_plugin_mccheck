@@ -9,7 +9,7 @@ import dns.name
 import base64
 import traceback
 from .data_source import MineStat, SlpProtocols, ConnStatus
-from .configs import lang_data, lang, message_type
+from .configs import lang_data, lang, message_type, VERSION
 from PIL import Image, ImageDraw, ImageFont
 from typing import Optional, Tuple, List
 from nonebot import require, logger
@@ -50,20 +50,20 @@ async def build_result(ms, type=0):
     返回:
     - 根据类型不同返回不同格式的查询结果。
     """
-    #    status = f"{ms.connection_status}|{lang_data[lang][str(ms.connection_status)]}"
     if type == 0:
         result = {
             "favicon": ms.favicon_b64 if ms.favicon else "no_favicon.png",
             "version": await parse_motd_to_html(ms.version),
             "slp_protocol": str(ms.slp_protocol),
+            "protocol_version": ms.protocol_version,
             "address": ms.address,
             "port": ms.port,
             "delay": f"{ms.latency}ms",
             "gamemode": ms.gamemode,
             "motd": await parse_motd_to_html(ms.motd),
             "players": f"{ms.current_players}/{ms.max_players}",
-            #            "status": f"{ms.connection_status}|{lang_data[lang][str(ms.connection_status)]}",
             "lang": lang_data[lang],
+            "VERSION": VERSION
         }
         from nonebot_plugin_htmlrender import template_to_pic
 
@@ -86,6 +86,7 @@ async def build_result(ms, type=0):
     base_result = (
         f"{version_part}"
         f"\n{lang_data[lang]['slp_protocol']}{ms.slp_protocol}"
+        f"\n{lang_data[lang]['protocol_version']}{ms.protocol_version}"
         f"\n{lang_data[lang]['address']}{ms.address}"
         f"\n{lang_data[lang]['port']}{ms.port}"
         f"\n{lang_data[lang]['delay']}{ms.latency}ms"
@@ -146,7 +147,7 @@ async def get_mc(
     return [await get_java(host, port, timeout), await get_bedrock(host, port, timeout)]
 
 
-async def get_message_list(ip: str, port: int, timeout: int = 5) -> list:
+async def get_message_list(ip: str, port: int, timeout: int = 5) -> List[Text]:
     """
     异步函数，根据IP和端口获取消息列表。
 
@@ -159,6 +160,7 @@ async def get_message_list(ip: str, port: int, timeout: int = 5) -> list:
     - list: 包含消息的列表。
     """
     srv = await resolve_srv(ip, port)
+    assert isinstance(srv[0], str)
     messages = []
     ms = await get_mc(srv[0], int(srv[1]), timeout)
     for i in ms:
@@ -278,7 +280,7 @@ async def is_invalid_address(address: str) -> bool:
     """
     # 域名正则（包含普通域名与 Punycode 支持）
     if address.lower() == "localhost":
-    	return False
+        return False
     domain_pattern = r"^(?!-)(?:[A-Za-z0-9-]{1,63}\.)+(?:[A-Za-z]{2,})$|^(xn--[A-Za-z0-9-]{1,63})\.[A-Za-z]{2,}$"
     ipv4_pattern = r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$"
     ipv6_pattern = r"^\s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?\s*$"
@@ -298,38 +300,38 @@ async def is_invalid_address(address: str) -> bool:
     return (match_domain is None) and (match_ipv4 is None) and (match_ipv6 is None)
 
 
-async def resolve_srv(ip: str, port: int = 0) -> List[str]:
-        """
-        通过DNS解析服务器地址和端口。
-    
-        如果指定的端口为0，则表示需要通过SRV记录解析端口。
-    
-        参数:
-            ip (str): 服务器IP地址。
-            port (int): 服务器端口，如果为0则需要通过SRV记录获取。
-    
-        返回:
-            list: 包含服务器地址和端口的列表。
-        """
-        resolver = dns.asyncresolver.Resolver()
-        resolver.timeout = 10
-        resolver.retries = 3
-        resolver.nameservers = ["223.5.5.5", "180.184.1.1", "1.1.1.1"]
-    
-        qname = dns.name.from_text(f"_minecraft._tcp.{ip}")
-    
-        with contextlib.suppress(dns.resolver.NoAnswer, dns.resolver.NXDOMAIN):
-            response = await resolver.resolve(qname, "SRV")
-    
-            if not response:
-                return [ip, port]
-    
-            for rdata in response:
-                address = str(rdata.target).rstrip(".")
-                if port == 0:
-                    port = rdata.port
-                return [address, port]
-        return [ip, port]
+async def resolve_srv(ip: str, port: int = 0) -> List[str|int]:
+    """
+    通过DNS解析服务器地址和端口。
+
+    如果指定的端口为0，则表示需要通过SRV记录解析端口。
+
+    参数:
+        ip (str): 服务器IP地址。
+        port (int): 服务器端口，如果为0则需要通过SRV记录获取。
+
+    返回:
+        list: 包含服务器地址和端口的列表。
+    """
+    resolver = dns.asyncresolver.Resolver()
+    resolver.timeout = 10
+    resolver.retries = 3 # type: ignore
+    resolver.nameservers = ["223.5.5.5", "180.184.1.1", "1.1.1.1"]
+
+    qname = dns.name.from_text(f"_minecraft._tcp.{ip}")
+
+    with contextlib.suppress(dns.resolver.NoAnswer, dns.resolver.NXDOMAIN): # type: ignore
+        response = await resolver.resolve(qname, "SRV")
+
+        if not response:
+            return [ip, port]
+
+        for rdata in response: # type: ignore
+            address = str(rdata.target).rstrip(".")
+            if port == 0:
+                port = rdata.port
+            return [address, port]
+    return [ip, port]
 
 
 async def parse_motd(json_data: Optional[str]) -> Optional[str]:
@@ -546,7 +548,9 @@ async def parse_motd_to_html(json_data: Optional[str]) -> Optional[str]:
                 color_html_str = (f'<span style="color:#{color_code};">', "</span>")
             else:
                 color_html_str = standard_color_map.get(color, ("", ""))
-                color_code = re.search(r'color:\s*#([0-9A-Fa-f]{6});', color_html_str[0])
+                color_code = re.search(
+                    r"color:\s*#([0-9A-Fa-f]{6});", color_html_str[0]
+                )
                 color_code = color_code[1] if color_code else "#FFFFFF"
             # 更新样式栈
             open_tag, close_tag = color_html_str
