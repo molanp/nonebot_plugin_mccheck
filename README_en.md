@@ -72,39 +72,27 @@ plugins = ["nonebot_plugin_mccheck"]
 - [x] Returns the server online status
 - [x] Query server latency
 - [x] More precise delay
-- [x] UDP server is supported
+- [x] Double-query on the interworking server is supported.
 - [x] Error message feedback
 - [x] Port autocompletion
-- [x] Wisdom~~Barrier~~ can determine whether the IP address is correct
-- [x] Get the JSON version of the server motd (only if the server motd is set to JSON format)
+- [x] Wisdom can determine whether the IP address is correct
 - [x] Does not depend on any external API :)
 - [x] Support special port queries (e.g. `2`, `80`, `443` etc.)
 - [x] Query server favicon
 - [x] Multilingual
 - [x] SRV support 
 - [x] Fully colored underlined/strikethrough
+- [x] Get server protocol number
 
 ## 📑 Future functions
 
-- [ ] Get server protocol number
-- [ ] Get server official website (if any)
 - [ ] And more...
 
 ## 🖼️ Test screenshot
 
-v0.1.22
+v0.1.37
+![v0.1.37]()
 
-Text message
-![0.1.22 text](https://github.com/user-attachments/assets/7099ded9-9c8c-482f-89e5-a68bd014e67a)
-
-Picture message
-![0.1.22 pic](https://github.com/user-attachments/assets/3ba422a4-bc41-4401-85c7-f5da2f693b03)
-
-HTML message
-![0.1.22 html](https://github.com/user-attachments/assets/09396694-16a4-4907-8b25-3863b181a725)
-
-Geyser server double check(More than just HTML messages are supported, only one is shown here)
-![0.1.22 geyser](https://github.com/user-attachments/assets/3982c18a-7cc5-4eb2-9f0f-9ec2a16fed2f)
 ## ⚙️ Configuration
 
 Add the required configuration in the following table to the `.env` file of the nonebot2 project.
