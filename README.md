@@ -95,7 +95,6 @@ conda install nonebot-plugin-mccheck
 v0.1.37
 ![v0.1.37](https://github.com/user-attachments/assets/619b9dc0-cda3-4949-9647-8f15e5db9ca5)
 
-
 ## ⚙️ 配置
 
 在 nonebot2 项目的`.env`文件中添加下表中的必填配置
