@@ -66,7 +66,7 @@ plugins = ["nonebot_plugin_mccheck"]
 - [x] Adapted unicode full fonts and glyphs
 - [x] Render Motd styles
 - [x] Query server nickname
-- [x] Query the maximum number of servers, the current number of people
+- [x] Query the maximum number of servers, the current number of players and player list
 - [x] Query server motd
 - [x] returns the server address and port
 - [x] Returns the server online status
@@ -91,7 +91,7 @@ plugins = ["nonebot_plugin_mccheck"]
 ## 🖼️ Test screenshot
 
 v0.1.37
-![v0.1.37]()
+![v0.1.37](https://github.com/user-attachments/assets/9962fc63-c004-4c79-b271-7e9156e65945)
 
 ## ⚙️ Configuration
 
