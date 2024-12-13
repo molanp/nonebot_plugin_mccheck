@@ -24,7 +24,7 @@ English|[简体中文](README.md)
 
 Minecraft server status query, supporting IPv6.
 
-> update synchronously with [https://github.com/molanp/zhenxun_check_minecraft/](https://github.com/molanp/zhenxun_check_minecraft).
+> update synchronously with [https://github.com/molanp/zhenxun_plugin_mccheck/](https://github.com/molanp/zhenxun_plugin_mccheck).
 
 ## 💿 Installation
 
