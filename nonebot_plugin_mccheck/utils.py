@@ -132,8 +132,7 @@ async def build_result(ms, type=0):
         )
 
 
-async def get_mc(
-    host: str, port: int, timeout: int = 5
+async def get_mc(java, bedrock, timeout: int = 5
 ) -> List[Tuple[Optional[MineStat], Optional[ConnStatus]]]:
     """
     获取Java版和Bedrock版的MC服务器信息。
@@ -147,7 +146,7 @@ async def get_mc(
     - list: 包含Java版和Bedrock版服务器信息的列表，如果列表为空则返回None。
     """
     loop = asyncio.get_event_loop()
-    return [await loop.run_in_executor(None, get_java, host, port, timeout), await loop.run_in_executor(None, get_bedrock, host, port, timeout)]
+    return [await loop.run_in_executor(None, get_java, java[0], java[1], timeout), await loop.run_in_executor(None, get_bedrock, bedrock[0], bedrock[1], timeout)]
 
 
 async def get_message_list(ip: str, port: int, timeout: int = 5) -> List[Text]:
@@ -165,7 +164,7 @@ async def get_message_list(ip: str, port: int, timeout: int = 5) -> List[Text]:
     srv = await resolve_srv(ip, port)
     assert isinstance(srv[0], str)
     messages = []
-    ms = await get_mc(srv[0], int(srv[1]), timeout)
+    ms = await get_mc((srv[0], int(srv[1])), (ip, port), timeout)
     for i in ms:
         if i[0] is not None:
             messages.append(await build_result(i[0], message_type))
