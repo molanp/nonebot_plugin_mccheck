@@ -1,6 +1,6 @@
 from .configs import lang_data, lang
 from .utils import (
-    is_invalid_address,
+    is_validity_address,
     get_message_list,
     parse_host,
     change_language_to,
@@ -65,7 +65,6 @@ lang_list = on_alconna(
     block=True,
 )
 
-
 @check.handle()
 async def _(host: Match[str]):
     if host.available:
@@ -79,11 +78,10 @@ async def handle_check(host: str):
     if not str(port).isdigit() or not (0 <= int(port) <= 65535):
         await check.finish(Text(f'{lang_data[lang]["where_port"]}'), reply_to=True)
 
-    if await is_invalid_address(address):
-        await check.finish(Text(f'{lang_data[lang]["where_ip"]}'), reply_to=True)
-
-    await get_info(address, port)
-
+    if await is_validity_address(address):
+        await get_info(address, port)
+        return
+    await check.finish(Text(f'{lang_data[lang]["where_ip"]}'), reply_to=True)
 
 async def get_info(ip, port):
     global ms
@@ -98,15 +96,12 @@ async def get_info(ip, port):
     except BaseException as e:
         await check.send(await handle_exception(e), reply_to=True)
 
-
 @lang_change.handle()
 async def _(language: str):
     if language:
         await lang_change.send(Text(await change_language_to(language)), reply_to=True)
     else:
         await lang_change.send(Text("Language?"), reply_to=True)
-
-
 @lang_now.handle()
 async def _():
     await lang_now.send(Text(f"Language: {lang}."), reply_to=True)

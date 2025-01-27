@@ -62,6 +62,7 @@ plugins = ["nonebot_plugin_mccheck"]
 
 ## 📈 Implemented functions
 
+- [x] IPv6 supported
 - [x] Full platform adapter support
 - [x] Adapted unicode full fonts and glyphs
 - [x] Render Motd styles
@@ -90,8 +91,28 @@ plugins = ["nonebot_plugin_mccheck"]
 
 ## 🖼️ Test screenshot
 
-v0.1.37
+v0.1.42
 ![v0.1.37](https://github.com/user-attachments/assets/9962fc63-c004-4c79-b271-7e9156e65945)
+![Image](https://github.com/user-attachments/assets/2ca058f5-2341-425d-8033-63dad8d43fbf)
+
+### 🎈 Special Notes
+Querying an IPv6 server
+```
+mcheck [2001:db8:85a3::8a2e:370:7334]:25565  <- IPv6 server address and port, the port and colon can be omitted
+```
+or
+```
+mcheck 2001:db8:85a3::8a2e:370:7334  <- IPv6 server address, the plugin will automatically complete the port number
+```
+or
+```
+mcheck 2001:db8:85a3::8a2e:370:7334:25565  <- IPv6 server address and port
+```
+or
+```
+mcheck [2001:db8:85a3::8a2e:370:7334]  <- IPv6服务器地址
+```
+
 
 ## ⚙️ Configuration
 
