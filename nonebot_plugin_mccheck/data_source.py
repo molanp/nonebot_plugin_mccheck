@@ -1,941 +1,1107 @@
-import asyncio
+# minestat.py - A Minecraft server status checker
+# Copyright (C) 2016-2023 Lloyd Dilley, Felix Ern (MindSolve)
+# http://www.dilley.me/
+#
+# Secondary optimization and customization are carried out by @molanp.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
 import base64
-import contextlib
+from enum import Enum
 import io
-import os
+import json
+import random
 import re
-import traceback
-
-import dns.asyncresolver
-import dns.name
-import idna
-from nonebot import require
-from PIL import Image, ImageDraw, ImageFont
-import ujson
-
-from zhenxun.services.log import logger
-
-from .configs import VERSION, lang, lang_data, message_type
-from .data_source import ConnStatus, MineStat, SlpProtocols
-
-require("nonebot_plugin_alconna")
-from nonebot_plugin_alconna import Image as NImage
-from nonebot_plugin_alconna import Text
+import socket
+import struct
+from time import perf_counter, time
 
 
-async def handle_exception(e):
-    error_message = str(e)
-    logger.error(traceback.format_exc())
-    return Text(f"[CrashHandle]{error_message}\n>>更多信息详见日志文件<<")
-
-
-async def change_language_to(language: str):
-    global lang
-
-    try:
-        _ = lang_data[language]
-    except KeyError:
-        return f"No language named '{language}'!"
-    else:
-        if language == lang:
-            return f"The language is already '{language}'!"
-        lang = language
-        return f"Change to '{language}' success!"
-
-
-async def build_result(ms, address, type=0):
+class ConnStatus(Enum):
     """
-    根据类型构建并返回查询结果。
+    Contains possible connection states.
 
-    参数:
-    - ms: 包含服务器信息的对象。
-    - type: 结果类型，决定返回结果的格式，默认为0。
-
-    返回:
-    - 根据类型不同返回不同格式的查询结果。
-    """
-    if type == 0:
-        result = {
-            "favicon": ms.favicon_b64 if ms.favicon else "no_favicon.png",
-            "version": await parse_motd2html(ms.version),
-            "slp_protocol": str(ms.slp_protocol),
-            "protocol_version": ms.protocol_version,
-            "address": address,
-            "ip": ms.address,
-            "port": ms.port,
-            "delay": f"{ms.latency}ms",
-            "gamemode": ms.gamemode,
-            "motd": await parse_motd2html(ms.motd),
-            "players": f"{ms.current_players}/{ms.max_players}",
-            "player_list": await parse_motd2html("§r, ".join(ms.player_list))
-            if ms.player_list
-            else None,
-            "lang": lang_data[lang],
-            "VERSION": VERSION,
-        }
-        from nonebot_plugin_htmlrender import template_to_pic
-
-        template_dir = os.path.join(os.path.dirname(__file__), "templates")
-        pic = await template_to_pic(
-            template_path=template_dir,
-            template_name="default.html",
-            templates={"data": result},
-        )
-        return NImage(raw=pic)
-    elif type == 1:
-        motd_part = (
-            f"\n{lang_data[lang]['motd']}{await parse_motd2mark(ms.motd)}[#RESET]"
-        )
-        version_part = (
-            f"\n{lang_data[lang]['version']}{await parse_motd2mark(ms.version)}[#RESET]"
-        )
-    elif type == 2:
-        motd_part = f"\n{lang_data[lang]['motd']}{ms.stripped_motd}"
-        version_part = f"\n{lang_data[lang]['version']}{ms.version}"
-
-    base_result = (
-        f"{version_part}"
-        f"\n{lang_data[lang]['slp_protocol']}{ms.slp_protocol}"
-        f"\n{lang_data[lang]['protocol_version']}{ms.protocol_version}"
-        f"\n{lang_data[lang]['address']}{address}"
-        f"\n{lang_data[lang]['ip']}{ms.address}"
-        f"\n{lang_data[lang]['port']}{ms.port}"
-        f"\n{lang_data[lang]['delay']}{ms.latency}ms"
-    )
-
-    if "BEDROCK" in str(ms.slp_protocol):
-        base_result += f"\n{lang_data[lang]['gamemode']}{ms.gamemode}"
-
-    result = (
-        base_result
-        + motd_part
-        + f"\n{lang_data[lang]['players']}{ms.current_players}/{ms.max_players}"
-    )
-    if type == 1:
-        result += (
-            f"""\n{lang_data[lang]["player_list"]}{
-                await parse_motd2mark(", ".join(ms.player_list))
-            }[#RESET]"""
-            if ms.player_list
-            else ""
-        )
-        return (
-            [
-                NImage(
-                    raw=(
-                        await ColoredTextImage(result).draw_text_with_style()
-                    ).pic2bytes()
-                ),
-                Text("Favicon:"),
-                NImage(raw=base64.b64decode(ms.favicon_b64.split(",")[1])),
-            ]
-            if ms.favicon is not None
-            else NImage(
-                raw=(await ColoredTextImage(result).draw_text_with_style()).pic2bytes()
-            )
-        )
-    elif type == 2:
-        result += (
-            f"\n{lang_data[lang]['player_list']}{', '.join(ms.player_list)}"
-            if ms.player_list
-            else ""
-        )
-        return (
-            [
-                Text(result),
-                Text("\nFavicon:"),
-                NImage(raw=base64.b64decode(ms.favicon_b64.split(",")[1])),
-            ]
-            if ms.favicon is not None
-            else [Text(result)]
-        )
-
-
-async def get_mc(
-    ip, port, ip_type, timeout: int = 5
-) -> list[tuple[MineStat | None, ConnStatus | None]]:
-    """
-    获取Java版和Bedrock版的MC服务器信息。
-
-    参数:
-    - ip (str): 服务器的IP地址。
-    - port (int): 服务器的端口。
-    - ip_type (int): 服务器的IP类型。
-    - timeout (int): 请求超时时间，默认为5秒。
-
-    返回:
-    - list: 包含Java版和Bedrock版服务器信息的列表。
-    """
-    loop = asyncio.get_event_loop()
-    if ip_type.startswith("SRV"):
-        return [await loop.run_in_executor(None, get_java, ip, port, ip_type, timeout)]
-    return [
-        await loop.run_in_executor(None, get_java, ip, port, ip_type, timeout),
-        await loop.run_in_executor(None, get_bedrock, ip, port, ip_type, timeout),
-    ]
-
-
-async def get_message_list(ip: str, port: int, timeout: int = 5) -> list[Text]:
-    """
-    异步函数，根据IP和端口获取消息列表。
-
-    参数:
-    - ip (str): 服务器的IP地址。
-    - port (int): 服务器的端口。
-    - timeout (int, 可选): 超时时间，默认为5秒。
-
-    返回:
-    - list: 包含消息的列表。
-    """
-    ip_groups = await get_origin_address(ip, port)
-    messages = []
-    results = await asyncio.gather(
-        *(
-            get_mc(ip_group[0], ip_group[1], ip_group[2], timeout)
-            for ip_group in ip_groups
-        )
-    )
-
-    for ms in results:
-        for i in ms:
-            if i[0] is not None:
-                messages.append(await build_result(i[0], ip, message_type))
-    if not messages:
-        messages.append(
-            next(
-                (
-                    Text(f"{lang_data[lang][str(item[1])]}")
-                    for ms in results
-                    for item in ms
-                    if item[1] != ConnStatus.CONNFAIL
-                ),
-                Text(f"{lang_data[lang][str(ConnStatus.CONNFAIL)]}"),
-            )
-        )
-    return messages
-
-
-def get_bedrock(
-    host: str, port: int, ip_type, timeout: int = 5
-) -> tuple[MineStat | None, ConnStatus | None]:
-    """
-    异步函数，用于通过指定的主机名、端口和超时时间获取Minecraft Bedrock版服务器状态。
-
-    参数:
-    - host: 服务器的主机名。
-    - port: 服务器的端口号。
-    - timeout: 连接超时时间，默认为5秒。
-
-    返回:
-    - MineStat实例，包含服务器状态信息，如果服务器在线的话；否则可能返回None。
-    """
-    v6 = "IPv6" in ip_type
-    result = MineStat(host, port, timeout, SlpProtocols.BEDROCK_RAKNET, v6)
-
-    if result.online:
-        return result, ConnStatus.SUCCESS
-    return None, result.connection_status
-
-
-def get_java(
-    host: str, port: int, ip_type, timeout: int = 5
-) -> tuple[MineStat | None, ConnStatus | None]:
-    """
-    异步函数，用于通过指定的主机名、端口和超时时间获取Minecraft Java版服务器状态。
-
-    参数:
-    - host: 服务器的主机名。
-    - port: 服务器的端口号。
-    - timeout: 连接超时时间，默认为5秒。
-
-    返回:
-    - MineStat 实例，包含服务器状态信息，如果服务器在线的话；否则可能返回 None。
-    """
-    v6 = "IPv6" in ip_type
-
-    # Minecraft 1.4 & 1.5 (legacy SLP)
-    result = MineStat(host, port, timeout, SlpProtocols.LEGACY, v6)
-
-    # Minecraft Beta 1.8 to Release 1.3 (beta SLP)
-    if result.connection_status not in [ConnStatus.CONNFAIL, ConnStatus.SUCCESS]:
-        result = MineStat(host, port, timeout, SlpProtocols.BETA, v6)
-
-    # Minecraft 1.6 (extended legacy SLP)
-    if result.connection_status is not ConnStatus.CONNFAIL:
-        result = MineStat(host, port, timeout, SlpProtocols.EXTENDED_LEGACY, v6)
-
-    # Minecraft 1.7+ (JSON SLP)
-    if result.connection_status is not ConnStatus.CONNFAIL:
-        result = MineStat(host, port, timeout, SlpProtocols.JSON, v6)
-
-    if result.online:
-        return result, ConnStatus.SUCCESS
-    return None, result.connection_status
-
-
-async def parse_host(host_name) -> tuple[str, int]:
-    """
-    解析主机名（可选端口）。
-
-    该函数尝试从主机名中提取IP地址和端口号。如果主机名中未指定端口，
-    则默认端口号为0。
-
-    参数:
-    host_name (str): 主机名，可能包含端口。
-
-    返回:
-    Tuple[str, int]: 一个元组，包含两个元素：
-    - 第一个元素是主机的IP地址（字符串形式）。
-    - 第二个元素是主机的端口号（整数形式），如果主机名中未指定端口，则为0。
-    """
-    pattern = r"(?:\[(.+?)\]|(.+?))(?:[:：](\d+))?$"
-    if not (match := re.match(pattern, host_name)):
-        return host_name, 0
-
-    address = match[1] or match[2]
-    port = int(match[3]) if match[3] else None
-
-    port = port if port is not None else 0
-
-    return address, port
-
-
-async def is_validity_address(address: str) -> bool:
-    """
-    异步判断给定的地址是否为有效的域名或IP地址。
-
-    参数:
-    address (str): 需要验证的地址，可以是域名地址或IP地址。
-
-    返回:
-    bool: 如果地址有效则返回True，否则返回False。
+    - `SUCCESS`: The specified SLP connection succeeded (Request & response parsing OK)
+    - `CONNFAIL`: The socket to the server could not be established. Server offline, wrong hostname or port?
+    - `TIMEOUT`: The connection timed out. (Server under too much load? Firewall rules OK?)
+    - `UNKNOWN`: The connection was established, but the server spoke an unknown/unsupported SLP protocol.
     """
 
-    return (
-        (await is_domain(address))
-        or (await is_ipv4(address))
-        or (await is_ipv6(address))
-    )
+    def __str__(self) -> str:
+        return str(self.name)
+
+    SUCCESS = 0
+    """The specified SLP connection succeeded (Request & response parsing OK)"""
+
+    CONNFAIL = -1
+    """The socket to the server could not be established. (Server offline, wrong hostname or port?)"""
+
+    TIMEOUT = -2
+    """The connection timed out. (Server under too much load? Firewall rules OK?)"""
+
+    UNKNOWN = -3
+    """The connection was established, but the server spoke an unknown/unsupported SLP protocol."""
 
 
-async def is_domain(address: str) -> bool:
+class SlpProtocols(Enum):
     """
-    判断给定的地址是否为域名。
+    Contains possible SLP (Server List Ping) protocols.
 
-    参数:
-    address (str): 需要验证的地址。
+    - `ALL`: Try all protocols.
 
-    返回:
-    bool: 如果地址为域名则返回True，否则返回False。
+      Attempts to connect to a remote server using all available protocols until an acceptable response
+      is received or until failure.
+
+    - `QUERY`: The Query / GameSpot4 / UT3 protocol for Mincraft Java servers.
+      Needs to be enabled on the Minecraft server.
+      Query is similar to SLP but additionally returns more technical related data.
+
+      *Available since Minecraft 1.9*
+
+    - `BEDROCK_RAKNET`: The Minecraft Bedrock/Education edition protocol.
+
+      *Available for all Minecraft Bedrock versions, not compatible with Java edition.*
+
+    - `JSON`: The newest and currently supported SLP protocol.
+
+      Uses (wrapped) JSON as payload. Complex query, see `json_query()` for the protocol implementation.
+
+      *Available since Minecraft 1.7*
+    - `EXTENDED_LEGACY`: The previous SLP protocol
+
+      Used by Minecraft 1.6, it is still supported by all newer server versions.
+      Complex query needed, see implementation `extended_legacy_query()` for full protocol details.
+
+      *Available since Minecraft 1.6*
+    - `LEGACY`: The legacy SLP protocol.
+
+      Used by Minecraft 1.4 and 1.5, it is the first protocol to contain the server version number.
+      Very simple protocol call (2 byte), simple response decoding.
+      See `legacy_query()` for full implementation and protocol details.
+
+      *Available since Minecraft 1.4*
+    - `BETA`: The first SLP protocol.
+
+      Used by Minecraft Beta 1.8 till Release 1.3, it is the first SLP protocol.
+      It contains very few details, no server version info, only MOTD, max- and online player counts.
+
+      *Available since Minecraft Beta 1.8*
     """
-    if address.lower() == "localhost":
-        return True
-    domain_pattern = re.compile(
-        r"^(?!-)(?:[A-Za-z0-9-]{1,63}\.)+(?:[A-Za-z]{2,})$|^(xn--[A-Za-z0-9-]{1,63})\.[A-Za-z]{2,}$"
-    )
-    try:
-        punycode_address = idna.encode(address).decode("utf-8")
-        return bool(domain_pattern.match(punycode_address))
-    except idna.IDNAError:
-        return False
 
+    def __str__(self) -> str:
+        return str(self.name)
 
-async def is_ipv4(address: str) -> bool:
+    ALL = 5
     """
-    判断给定的地址是否为IPv4地址。
+  Attempt to use all protocols.
+  """
 
-    参数:
-    address (str): 需要验证的地址。
-
-    返回:
-    bool: 如果地址为IPv4地址则返回True，否则返回False。
+    QUERY = 6
     """
-    ipv4_pattern = re.compile(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$")
-    match_ipv4 = ipv4_pattern.match(address)
+  The Query / GameSpot4 / UT3 protocol for Mincraft Java servers.
+  Needs to be enabled on the Minecraft server.
 
-    if not match_ipv4:
-        return False
+  Query is similar to SLP but additionally returns more technical related data.
 
-    parts = address.split(".")
-    return not any(not part.isdigit() or not 0 <= int(part) <= 255 for part in parts)
+  *Available since Minecraft 1.9*
+  """
 
-
-async def is_ipv6(address: str) -> bool:
+    BEDROCK_RAKNET = 4
     """
-    判断给定的地址是否为IPv6地址。
+  The Bedrock SLP-equivalent using the RakNet `Unconnected Ping` packet.
 
-    参数:
-    address (str): 需要验证的地址。
+  Currently experimental.
+  """
 
-    返回:
-    bool: 如果地址为IPv6地址则返回True，否则返回False。
+    JSON = 3
     """
-    ipv6_pattern = re.compile(
-        r"^\s*((([0-9A-Fa-f]{1,4}:){7}([0-9A-Fa-f]{1,4}|:))|(([0-9A-Fa-f]{1,4}:){6}(:[0-9A-Fa-f]{1,4}|((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){5}(((:[0-9A-Fa-f]{1,4}){1,2})|:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})|:))|(([0-9A-Fa-f]{1,4}:){4}(((:[0-9A-Fa-f]{1,4}){1,3})|((:[0-9A-Fa-f]{1,4})?:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){3}(((:[0-9A-Fa-f]{1,4}){1,4})|((:[0-9A-Fa-f]{1,4}){0,2}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){2}(((:[0-9A-Fa-f]{1,4}){1,5})|((:[0-9A-Fa-f]{1,4}){0,3}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(([0-9A-Fa-f]{1,4}:){1}(((:[0-9A-Fa-f]{1,4}){1,6})|((:[0-9A-Fa-f]{1,4}){0,4}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:))|(:(((:[0-9A-Fa-f]{1,4}){1,7})|((:[0-9A-Fa-f]{1,4}){0,5}:((25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(\.(25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}))|:)))(%.+)?\s*$"
-    )
-    match_ipv6 = ipv6_pattern.match(address)
+  The newest and currently supported SLP protocol.
 
-    return bool(match_ipv6)
+  Uses (wrapped) JSON as payload. Complex query, see `json_query()` for the protocol implementation.
 
+  *Available since Minecraft 1.7*
+  """
 
-async def get_ip_type(address: str) -> str:
-    if not await is_validity_address(address):
-        return "Unknown"
-    if await is_ipv4(address):
-        return "IPv4"
-    elif await is_ipv6(address):
-        return "IPv6"
-    else:
-        return "Domain"
+    EXTENDED_LEGACY = 2
+    """The previous SLP protocol
 
+  Used by Minecraft 1.6, it is still supported by all newer server versions.
+  Complex query needed, see implementation `extended_legacy_query()` for full protocol details.
 
-async def get_origin_address(
-    domain: str, ip_port: int, is_resolve_srv=True
-) -> list[tuple[str, int, str]]:
+  *Available since Minecraft 1.6*
+  """
+
+    LEGACY = 1
     """
-    获取地址所解析的A或AAAA记录，如果传入不是域名直接返回。
-    同时返回地址是IPv6还是IPv4。
-    如果地址是域名，首先尝试解析SRV记录。
+  The legacy SLP protocol.
 
-    参数:
-    - address (str): 需要解析的地址。
-    - ip_port (int): 适用于IPv4和IPv6地址的默认端口号。
+  Used by Minecraft 1.4 and 1.5, it is the first protocol to contain the server version number.
+  Very simple protocol call (2 byte), simple response decoding.
+  See `legacy_query()` for full implementation and protocol details.
 
-    返回:
-    - List[Tuple[str, int,str]]: 一个列表，包含一个元组，元组包含三个元素：
-      - 第一个元素是解析后的地址（字符串形式）。
-      - 第二个元素是地址的端口号（整数形式。
-      - 第三个元素是地址的类型（"IPv4" 或 "IPv6" 或 "SRV"）。
+  *Available since Minecraft 1.4*
+  """
+
+    BETA = 0
     """
-    ip_type = await get_ip_type(domain)
-    if ip_type != "Domain":
-        return [(domain, ip_port, ip_type)]
-    data = []
+  The first SLP protocol.
 
-    resolver = dns.asyncresolver.Resolver()
-    resolver.timeout = 10
-    resolver.retries = 3
+  Used by Minecraft Beta 1.8 till Release 1.3, it is the first SLP protocol.
+  It contains very few details, no server version info, only MOTD, max- and online player counts.
 
-    async def resolve_srv():
-        with contextlib.suppress(
-            dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.exception.Timeout
-        ):
-            srv_response = await resolver.resolve(f"_minecraft._tcp.{domain}", "SRV")
-            for rdata in srv_response:
-                srv_address = str(rdata.target).rstrip(".")
-                srv_port = rdata.port
-                ip_type = await get_ip_type(srv_address)
-                if ip_type == "Domain":
-                    srv_address = await get_origin_address(srv_address, srv_port, False)
-                    data.extend([(addr, port, f"SRV-{ip_type}") for addr, port, ip_type in srv_address])
-                else:
-                    data.append((srv_address, srv_port, "SRV"))
-
-    async def resolve_aaaa():
-        with contextlib.suppress(
-            dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.exception.Timeout
-        ):
-            response = await resolver.resolve(domain, "AAAA")
-            for rdata in response:
-                data.append((str(rdata.address), ip_port, "IPv6"))
-
-    async def resolve_a():
-        with contextlib.suppress(
-            dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.exception.Timeout
-        ):
-            response = await resolver.resolve(domain, "A")
-            for rdata in response:
-                data.append((str(rdata.address), ip_port, "IPv4"))
-
-    if is_resolve_srv:
-        await asyncio.gather(resolve_srv(), resolve_aaaa(), resolve_a())
-    else:
-        await asyncio.gather(resolve_aaaa(), resolve_a())
-
-    return data
+  *Available since Minecraft Beta 1.8*
+  """
 
 
-async def parse_motd2mark(json_data: str | None) -> str | None:
-    """
-    解析MOTD数据并转换为带有自定义十六进制颜色标记的字符串。
+class MineStat:
+    VERSION = "2.6.3"
+    """The MineStat version"""
+    DEFAULT_TCP_PORT = 25565
+    """default TCP port for SLP queries"""
+    DEFAULT_BEDROCK_PORT = 19132
+    """default UDP port for Bedrock/MCPE servers"""
+    DEFAULT_TIMEOUT = 5
+    """default TCP timeout in seconds"""
 
-    参数:
-    - json_data (str | None): MOTD数据。
-
-    返回:
-    - str | None: 带有自定义十六进制颜色标记的字符串。
-    """
-    if json_data is None:
-        return None
-
-    standard_color_map = {
-        "black": "[#000]",
-        "dark_blue": "[#00A]",
-        "dark_green": "[#0A0]",
-        "dark_aqua": "[#0AA]",
-        "dark_red": "[#A00]",
-        "dark_purple": "[#A0A]",
-        "gold": "[#FFA]",
-        "gray": "[#AAA]",
-        "dark_gray": "[#555]",
-        "blue": "[#00F]",
-        "green": "[#0F0]",
-        "aqua": "[#0FF]",
-        "red": "[#F00]",
-        "light_purple": "[#FAF]",
-        "yellow": "[#FF0]",
-        "white": "[#FFF]",
-        "reset": "[#RESET]",
-        "bold": "[#BOLD]",
-        "italic": "[#ITALIC]",
-        "underline": "[#UNDERLINE]",
-        "strikethrough": "[#STRIKETHROUGH]",
-        "§0": "[#000]",  # black
-        "§1": "[#00A]",  # dark blue
-        "§2": "[#0A0]",  # dark green
-        "§3": "[#0AA]",  # dark aqua
-        "§4": "[#A00]",  # dark red
-        "§5": "[#A0A]",  # dark purple
-        "§6": "[#FFA]",  # gold
-        "§7": "[#AAA]",  # gray
-        "§8": "[#555]",  # dark gray
-        "§9": "[#00F]",  # blue
-        "§a": "[#0F0]",  # green
-        "§b": "[#0FF]",  # aqua
-        "§c": "[#F00]",  # red
-        "§d": "[#FAF]",  # light purple
-        "§e": "[#FF0]",  # yellow
-        "§f": "[#FFF]",  # white
-        "§g": "[#DDD605]",  # minecoin gold
-        "§h": "[#E3D4D1]",  # material quartz
-        "§i": "[#CECACA]",  # material iron
-        "§j": "[#443A3B]",  # material netherite
-        "§l": "[#BOLD]",  # bold
-        "§m": "[#STRIKETHROUGH]",  # strikethrough
-        "§n": "[#UNDERLINE]",  # underline
-        "§o": "[#ITALIC]",  # italic
-        "§p": "[#DEB12D]",  # material gold
-        "§q": "[#47A036]",  # material emerald
-        "§r": "[#RESET]",  # reset
-        "§s": "[#2CBAA8]",  # material diamond
-        "§t": "[#21497B]",  # material lapis
-        "§u": "[#9A5CC6]",  # material amethyst
-    }
-
-    try:
-        json_data = ujson.loads(json_data)
-    except ujson.JSONDecodeError:
-        result = ""
-        i = 0
-        while i < len(json_data):
-            if json_data[i] == "§":
-                style_code = json_data[i : i + 2]
-                if style_code in standard_color_map:
-                    result += standard_color_map[style_code]
-                    i += 2
-                    continue
-            result += json_data[i]
-            i += 1
-
-        return result
-
-    async def parse_extra(extra):
-        result = ""
-        extra_str = ""
-        if isinstance(extra, dict) and "extra" in extra:
-            for key in extra:
-                if key == "extra":
-                    result += await parse_extra(extra[key])
-                elif key == "text":
-                    result += await parse_extra(extra[key])
-        elif isinstance(extra, dict):
-            color = extra.get("color", "")
-            text = extra.get("text", "")
-
-            if color.startswith("#"):
-                hex_color = color[1:]
-                if len(hex_color) == 3:
-                    hex_color = "".join([c * 2 for c in hex_color])
-                color_str = f"[#{hex_color.upper()}]"
-            else:
-                color_str = standard_color_map.get(color, "")
-
-            if extra.get("bold") is True:
-                extra_str += standard_color_map["bold"]
-            if extra.get("italic") is True:
-                extra_str += standard_color_map["italic"]
-            if extra.get("underline") is True:
-                extra_str += standard_color_map["underline"]
-            if extra.get("strikethrough") is True:
-                extra_str += standard_color_map["strikethrough"]
-
-            result += f"{extra_str}{color_str}{text}[#RESET]"
-        elif isinstance(extra, list):
-            for item in extra:
-                result += await parse_extra(item)
-        else:
-            result += str(extra)
-
-        return result
-
-    return await parse_extra(json_data)
-
-
-async def parse_motd2html(json_data: str | None) -> str | None:
-    """
-    解析MOTD数据并转换为带有自定义颜色的HTML字符串。
-
-    参数:
-    - json_data (str|None): MOTD数据。
-
-    返回:
-    - str | None: 带有自定义颜色的HTML字符串。
-    """
-    if json_data is None:
-        return None
-
-    standard_color_map = {
-        "black": ('<span style="color:#000000;">', "</span>"),
-        "dark_blue": ('<span style="color:#0000AA;">', "</span>"),
-        "dark_green": ('<span style="color:#00AA00;">', "</span>"),
-        "dark_aqua": ('<span style="color:#00AAAA;">', "</span>"),
-        "dark_red": ('<span style="color:#AA0000;">', "</span>"),
-        "dark_purple": ('<span style="color:#AA00AA;">', "</span>"),
-        "gold": ('<span style="color:#FFAA00;">', "</span>"),
-        "gray": ('<span style="color:#AAAAAA;">', "</span>"),
-        "dark_gray": ('<span style="color:#555555;">', "</span>"),
-        "blue": ('<span style="color:#0000FF;">', "</span>"),
-        "green": ('<span style="color:#00AA00;">', "</span>"),
-        "aqua": ('<span style="color:#00AAAA;">', "</span>"),
-        "red": ('<span style="color:#AA0000;">', "</span>"),
-        "light_purple": ('<span style="color:#FFAAFF;">', "</span>"),
-        "yellow": ('<span style="color:#FFFF00;">', "</span>"),
-        "white": ('<span style="color:#FFFFFF;">', "</span>"),
-        "reset": ("</b></i></u></s>", ""),
-        "bold": ("<b style='color: {};'>", "</b>"),
-        "italic": ("<i style='color: {};'>", "</i>"),
-        "underline": ("<u style='color: {};'>", "</u>"),
-        "strikethrough": ("<s style='color: {};'>", "</s>"),
-        "§0": ('<span style="color:#000000;">', "</span>"),  # black
-        "§1": ('<span style="color:#0000AA;">', "</span>"),  # dark blue
-        "§2": ('<span style="color:#00AA00;">', "</span>"),  # dark green
-        "§3": ('<span style="color:#00AAAA;">', "</span>"),  # dark aqua
-        "§4": ('<span style="color:#AA0000;">', "</span>"),  # dark red
-        "§5": ('<span style="color:#AA00AA;">', "</span>"),  # dark purple
-        "§6": ('<span style="color:#FFAA00;">', "</span>"),  # gold
-        "§7": ('<span style="color:#AAAAAA;">', "</span>"),  # gray
-        "§8": ('<span style="color:#555555;">', "</span>"),  # dark gray
-        "§9": ('<span style="color:#0000FF;">', "</span>"),  # blue
-        "§a": ('<span style="color:#00AA00;">', "</span>"),  # green
-        "§b": ('<span style="color:#00AAAA;">', "</span>"),  # aqua
-        "§c": ('<span style="color:#AA0000;">', "</span>"),  # red
-        "§d": ('<span style="color:#FFAAFF;">', "</span>"),  # light purple
-        "§e": ('<span style="color:#FFFF00;">', "</span>"),  # yellow
-        "§f": ('<span style="color:#FFFFFF;">', "</span>"),  # white
-        "§g": ('<span style="color:#DDD605;">', "</span>"),  # minecoin gold
-        "§h": ('<span style="color:#E3D4D1;">', "</span>"),  # material quartz
-        "§i": ('<span style="color:#CECACA;">', "</span>"),  # material iron
-        # material netherite
-        "§j": ('<span style="color:#443A3B;">', "</span>"),
-        "§l": ("<b style='color: {};'>", "</b>"),  # bold
-        "§m": ("<s style='color: {};'>", "</s>"),  # strikethrough
-        "§n": ("<u style='color: {};'>", "</u>"),  # underline
-        "§o": ("<i style='color: {};'>", "</i>"),  # italic
-        "§p": ('<span style="color:#DEB12D;">', "</span>"),  # material gold
-        "§q": ('<span style="color:#47A036;">', "</span>"),  # material emerald
-        "§r": ("</b></i></u></s>", ""),  # reset
-        "§s": ('<span style="color:#2CBAA8;">', "</span>"),  # material diamond
-        "§t": ('<span style="color:#21497B;">', "</span>"),  # material lapis
-        "§u": ('<span style="color:#9A5CC6;">', "</span>"),  # material amethyst
-    }
-
-    async def parse_extra(extra, styles=[]):
-        result = ""
-        if isinstance(extra, dict) and "extra" in extra:
-            for key in extra:
-                if key == "extra":
-                    result += await parse_extra(extra[key], styles)
-                elif key == "text":
-                    result += await parse_extra(extra[key], styles)
-        elif isinstance(extra, dict):
-            color = extra.get("color", "")
-            text = extra.get("text", "")
-
-            # 将颜色转换为 HTML 的 font 标签
-            if color.startswith("#"):
-                hex_color = color[1:]
-                if len(hex_color) == 3:
-                    hex_color = "".join([c * 2 for c in hex_color])
-                color_code = hex_color.upper()
-                color_html_str = (f'<span style="color:#{color_code};">', "</span>")
-            else:
-                color_html_str = standard_color_map.get(color, ("", ""))
-                color_code = re.search(
-                    r"color:\s*#([0-9A-Fa-f]{6});", color_html_str[0]
-                )
-                color_code = color_code[1] if color_code else "#FFFFFF"
-            # 更新样式栈
-            open_tag, close_tag = color_html_str
-            if extra.get("bold") is True:
-                open_tag_, close_tag_ = standard_color_map["bold"]
-                open_tag += open_tag_.format(color_code)
-                close_tag = close_tag_ + close_tag
-            if extra.get("italic") is True:
-                open_tag_, close_tag_ = standard_color_map["italic"]
-                open_tag += open_tag_.format(color_code)
-                close_tag = close_tag_ + close_tag
-            if extra.get("underline") is True:
-                open_tag_, close_tag_ = standard_color_map["underline"]
-                open_tag += open_tag_.format(color_code)
-                close_tag = close_tag_ + close_tag
-            if extra.get("strikethrough") is True:
-                open_tag_, close_tag_ = standard_color_map["strikethrough"]
-                open_tag += open_tag_.format(color_code)
-                close_tag = close_tag_ + close_tag
-            styles.append(close_tag)
-            result += open_tag + text + close_tag
-        elif isinstance(extra, list):
-            for item in extra:
-                result += await parse_extra(item, styles)
-        else:
-            result += str(extra)
-        return result.replace("\n", "<br>")
-
-    try:
-        json_data = ujson.loads(json_data)
-    except ujson.JSONDecodeError:
-        result = ""
-        i = 0
-        styles = []
-        while i < len(json_data):
-            if json_data[i] == "§":
-                style_code = json_data[i : i + 2]
-                if style_code in standard_color_map:
-                    open_tag, close_tag = standard_color_map[style_code]
-
-                    # 如果是重置，则清空样式栈
-                    if open_tag == "</b></i></u></s>":
-                        # 清空样式栈并关闭所有打开的样式
-                        for tag in styles:
-                            result += tag
-                        styles.clear()
-                    else:
-                        styles.append(close_tag)
-                        result += open_tag
-                    i += 2
-                    continue
-            # 处理换行符
-            if json_data[i : i + 2] == "\n":
-                result += "<br>"
-                i += 2
-                continue
-            result += json_data[i]
-            i += 1
-
-        # 在字符串末尾关闭所有打开的样式
-        for tag in styles:
-            result += tag
-
-        return result
-
-    return await parse_extra(json_data)
-
-
-class ColoredTextImage:
     def __init__(
         self,
-        text: str,
-        background_color: tuple[int, int, int] = (249, 246, 242),
-        padding: int = 10,
+        address: str,
+        port: int = 0,
+        timeout: int = DEFAULT_TIMEOUT,
+        query_protocol: SlpProtocols = SlpProtocols.ALL,
+        refer: str | None = None,
+        use_ip_v6: bool | None = False,
     ) -> None:
         """
-        初始化一个用于绘制彩色文本图像的对象。
+        minestat - The Minecraft status checker. Supports Minecraft Java edition and Bedrock/Education/PE servers.
+
+        :param address: Hostname or IP address of the Minecraft server.
+        :param port: Optional port of the Minecraft server. Defaults to auto detection (25565 for Java Edition, 19132 for Bedrock/MCPE).
+        :param timeout: Optional timeout in seconds for each connection attempt. Defaults to 5 seconds.
+        :param query_protocol: Optional protocol to use. See minestat.SlpProtocols for available choices. Defaults to auto detection.
+        :param refer: The source of IP in the send packet Default use address.
+        :param use_ip_v6: Optional, whether to use ip_v6 for DNS resolution. Defaults to False.
         """
-        self.text = text
-        self.padding = padding
-        self.background_color = background_color
-        self.font_path = os.path.join(os.path.dirname(__file__), "font", "Regular.ttf")
-        self.bold_font_path = os.path.join(
-            os.path.dirname(__file__), "font", "Bold.ttf"
+
+        """Whether to use ip_v6 for DNS resolution"""
+        self.use_ip_v6: bool | None = use_ip_v6
+
+        """The source of the IP in the sent packet"""
+        if refer is None:
+           self.refer = address
+        else:
+           self.refer = refer
+
+        self.address: str = address
+        """hostname or IP address of the Minecraft server"""
+
+        autoport: bool = False
+        if not port:
+            autoport = True
+            if query_protocol is SlpProtocols.BEDROCK_RAKNET:
+                port = self.DEFAULT_BEDROCK_PORT
+            else:
+                port = self.DEFAULT_TCP_PORT
+
+        self.port: int = port
+        """port number the Minecraft server accepts connections on"""
+        self.online: bool = False
+        """online or offline?"""
+        self.version: str | None = None
+        """server version"""
+        self.plugins: list[str] | None = None
+        """list of plugins returned by the Query protcol, may be empty"""
+        self.motd: str | None = None
+        """message of the day, unchanged server response (including formatting codes/JSON)"""
+        self.stripped_motd: str | None = None
+        """message of the day, stripped of all formatting ("human-readable")"""
+        self.current_players: int | None = None
+        """current number of players online"""
+        self.max_players: int | None = None
+        """maximum player capacity"""
+        self.player_list: list[str] | None = None
+        """list of online players, may be empty even if "current_players" is over 0"""
+        self.map: str | None = None
+        """the name of the map the server is running on, only supported by the Query protocol"""
+        self.latency: int | None = None
+        """ping time to server in milliseconds"""
+        self.timeout: int = timeout
+        """socket timeout"""
+        self.slp_protocol: SlpProtocols | None = None
+        """Server List Ping protocol"""
+        self.protocol_version: int | None = None
+        """Server protocol version"""
+        self.favicon_b64: str | None = None
+        """base64-encoded favicon possibly contained in JSON 1.7 responses"""
+        self.favicon: str | None = None
+        """decoded favicon data"""
+        self.gamemode: str | None = None
+        """Bedrock specific: The current game mode (Creative/Survival/Adventure)"""
+        self.srv_record: bool | None = None
+        """wether the server has a SRV record"""
+        self.connection_status: ConnStatus | None = None
+        """Status of connection ("SUCCESS", "CONNFAIL", "TIMEOUT", or "UNKNOWN")"""
+
+        # Future improvement: IPv4/IPv6, multiple addresses
+        # If a host has multiple IP addresses or a IPv4 and a IPv6 address,
+        # socket.connect choses the first IPv4 address returned by DNS.
+        # If a mc server is not available over IPv4, this failes as "offline".
+        # Or in some environments, the DNS returns the external and the internal
+        # address, but from an internal client, only the internal address is reachable
+        # See https://docs.python.org/3/library/socket.html#socket.getaddrinfo
+
+        # If the user wants a specific protocol, use only that.
+        result = ConnStatus.UNKNOWN
+        if query_protocol is not SlpProtocols.ALL:
+            if query_protocol is SlpProtocols.BETA:
+                result = self.beta_query()
+            elif query_protocol is SlpProtocols.LEGACY:
+                result = self.legacy_query()
+            elif query_protocol is SlpProtocols.EXTENDED_LEGACY:
+                result = self.extended_legacy_query()
+            elif query_protocol is SlpProtocols.JSON:
+                result = self.json_query()
+            elif query_protocol is SlpProtocols.BEDROCK_RAKNET:
+                result = self.bedrock_raknet_query()
+            elif query_protocol is SlpProtocols.QUERY:
+                result = self.fullstat_query()
+            self.connection_status = result
+
+            return
+
+        # Note: The order for Java edition here is unfortunately important.
+        # Some older versions of MC don't accept packets for a few seconds
+        # after receiving a not understood packet.
+        # An example is MC 1.4: Nothing works directly after a json request.
+        # A legacy query alone works fine.
+
+        # Minecraft Bedrock/Pocket/Education Edition (MCPE/MCEE)
+        if autoport and not self.port:
+            self.port = self.DEFAULT_BEDROCK_PORT
+
+        result = self.bedrock_raknet_query()
+        self.connection_status = result
+
+        if result is ConnStatus.SUCCESS:
+            return
+
+        if autoport and not self.port:
+            self.port = self.DEFAULT_TCP_PORT
+
+        # Minecraft 1.4 & 1.5 (legacy SLP)
+        result = self.legacy_query()
+
+        # Minecraft Beta 1.8 to Release 1.3 (beta SLP)
+        if result not in [ConnStatus.CONNFAIL, ConnStatus.SUCCESS]:
+            result = self.beta_query()
+
+        # Minecraft 1.6 (extended legacy SLP)
+        if result is not ConnStatus.CONNFAIL:
+            result = self.extended_legacy_query()
+
+        # Minecraft 1.7+ (JSON SLP)
+        if result is not ConnStatus.CONNFAIL:
+            self.json_query()
+
+        self.connection_status = ConnStatus.SUCCESS if self.online else result
+
+    @staticmethod
+    def motd_strip_formatting(raw_motd: str | dict) -> str:
+        """
+        Function for stripping all formatting codes from a motd. Supports Json Chat components (as dict) and
+        the legacy formatting codes.
+
+        :param raw_motd: The raw MOTD, either as a string or dict (from "json.loads()")
+        """
+        stripped_motd = ""
+
+        if isinstance(raw_motd, str):
+            stripped_motd = re.sub(r"§.", "", raw_motd)
+
+        elif isinstance(raw_motd, dict):
+            stripped_motd = raw_motd.get("text", "")
+
+            if raw_motd.get("extra"):
+                for sub in raw_motd["extra"]:
+                    stripped_motd += MineStat.motd_strip_formatting(sub)
+
+        return stripped_motd
+
+    def bedrock_raknet_query(self) -> ConnStatus:
+        """
+        Method for querying a Bedrock server (Minecraft PE, Windows 10 or Education Edition).
+        The protocol is based on the RakNet protocol.
+
+        See https://wiki.vg/Raknet_Protocol#Unconnected_Ping
+
+        Note: This method currently works as if the connection is handled via TCP (as if no packet loss might occur).
+        Packet loss handling should be implemented (resending).
+        """
+
+        RAKNET_MAGIC = bytearray(
+            [
+                0x00,
+                0xFF,
+                0xFF,
+                0x00,
+                0xFE,
+                0xFE,
+                0xFE,
+                0xFE,
+                0xFD,
+                0xFD,
+                0xFD,
+                0xFD,
+                0x12,
+                0x34,
+                0x56,
+                0x78,
+            ]
         )
-        self.bold_and_italic_font_path = os.path.join(
-            os.path.dirname(__file__), "font", "Bold_Italic.ttf"
+
+        # Create socket with type DGRAM (for UDP)
+        if self.use_ip_v6:
+            sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        else:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        sock.settimeout(self.timeout)
+
+        try:
+            self._extracted_from_beta_query_19(sock)
+        except TimeoutError:
+            return ConnStatus.TIMEOUT
+        except OSError:
+            return ConnStatus.CONNFAIL
+
+        # Construct the `Unconnected_Ping` packet
+        # Packet ID - 0x01
+        req_data = bytearray([0x01])
+        # current unix timestamp in ms as signed long (64-bit) LE-encoded
+        req_data += struct.pack("<q", int(time() * 1000))
+        # RakNet MAGIC (0x00ffff00fefefefefdfdfdfd12345678)
+        req_data += RAKNET_MAGIC
+        # Client GUID - as signed long (64-bit) LE-encoded
+        req_data += struct.pack("<q", 0x02)
+
+        sock.send(req_data)
+
+        # Do all the receiving in a try-catch, to reduce duplication of error handling
+
+        # response packet:
+        # byte - 0x1C - Unconnected Pong
+        # long - timestamp
+        # long - server GUID
+        # 16 byte - magic
+        # short - Server ID string length
+        # string - Server ID string
+        try:
+            response_buffer, response_addr = sock.recvfrom(1024)
+            response_stream = io.BytesIO(response_buffer)
+
+            # Receive packet id
+            packet_id = response_stream.read(1)
+
+            # Response packet ID should always be 0x1c
+            if packet_id != b"\x1c":
+                return ConnStatus.UNKNOWN
+
+            # Receive (& ignore) response timestamp
+            response_timestamp = struct.unpack("<q", response_stream.read(8))
+
+            # Server GUID
+            response_server_guid = struct.unpack("<q", response_stream.read(8))
+
+            # Magic
+            response_magic = response_stream.read(16)
+            if response_magic != RAKNET_MAGIC:
+                return ConnStatus.UNKNOWN
+
+            # Server ID string length
+            response_id_string_length = struct.unpack(">h", response_stream.read(2))
+
+            # Receive server ID string
+            response_id_string = response_stream.read().decode("utf8")
+
+        except TimeoutError:
+            return ConnStatus.TIMEOUT
+        except (ConnectionResetError, ConnectionAbortedError):
+            return ConnStatus.UNKNOWN
+        except OSError:
+            return ConnStatus.CONNFAIL
+        finally:
+            sock.close()
+
+        # Set protocol version
+        self.slp_protocol = SlpProtocols.BEDROCK_RAKNET
+
+        # Parse and save to object attributes
+        return self.__parse_bedrock_payload(response_id_string)
+
+    def __parse_bedrock_payload(self, payload_str: str) -> ConnStatus:
+        motd_index = [
+            "edition",
+            "motd_1",
+            "protocol_version",
+            "version",
+            "current_players",
+            "max_players",
+            "server_uid",
+            "motd_2",
+            "gamemode",
+            "gamemode_numeric",
+            "port_ipv4",
+            "port_ipv6",
+        ]
+        payload = dict(zip(motd_index, payload_str.split(";")))
+
+        self.online = True
+        self.protocol_version = int(payload["protocol_version"])
+
+        self.current_players = int(payload["current_players"])
+        self.max_players = int(payload["max_players"])
+        try:
+            self.version = (
+                payload["version"]
+                + " "
+                + payload["motd_2"]
+                + " ("
+                + payload["edition"]
+                + ")"
+            )
+        except (
+            KeyError
+        ):  # older Bedrock server versions do not respond with the secondary MotD.
+            self.version = payload["version"] + " (" + payload["edition"] + ")"
+
+        self.motd = payload["motd_1"]
+        self.stripped_motd = self.motd_strip_formatting(self.motd)
+
+        try:
+            self.gamemode = payload["gamemode"]
+        except (
+            KeyError
+        ):  # older Bedrock server versions do not respond with the game mode.
+            self.gamemode = None
+
+        return ConnStatus.SUCCESS
+
+    def fullstat_query(self) -> ConnStatus:
+        """
+        Method for querying a Minecraft Java server using the fullstat Query / GameSpot4 / UT3 protocol.
+        Needs to be enabled on the Minecraft server using:
+
+        "enable-query=true"
+
+        in the servers "server.properties" file.
+
+        This method ONLY supports full stat querys.
+        Documentation for this protocol: https://wiki.vg/Query
+        """
+        # protocol:
+        #   send handshake request
+        #   receive challenge token
+        #   send full stat request
+        #   receive status data
+
+        # Create UDP socket and set timeout
+        if self.use_ip_v6:
+            sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+        else:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.settimeout(self.timeout)
+
+        # padding that is prefixes to every packet
+        magic = b"\xfe\xfd"
+
+        # packettypes for the multiple packets send by the client
+        handshake_packettype = struct.pack("!B", 9)
+        stat_packettype = struct.pack("!B", 0)
+
+        # generate session id
+        session_id_int = random.randint(0, 2147483648) & 0x0F0F0F0F
+        session_id_bytes = struct.pack(">l", session_id_int)
+
+        # handshake packet:
+        #   contains 0xFE0xFD as a prefix
+        #   contains type of the packet, 9 for hanshaking in this case (encoded in Bytes as a big-endian)
+        #   contains session id (is generated randomly at the begining)
+
+        # construct the handshake packet
+        handshake_packet = magic
+        handshake_packet += handshake_packettype
+        handshake_packet += session_id_bytes
+
+        # send packet to server
+        sock.sendto(handshake_packet, (self.address, self.port))
+
+        try:
+            # receive the handshake response
+            handshake_res = sock.recv(24)
+
+            # extract the challenge token from the server. The beginning of the packet can be ignored.
+            challenge_token = handshake_res[5:].rstrip(b"\00")
+
+            # pack the challenge token into a big-endian long (int32)
+            challenge_token_bytes = struct.pack(">l", int(challenge_token))
+
+            # full stat request packet:
+            #   contains 0xFE0xFD as a prefix
+            #   contains type of the packet, 0 for hanshaking in this case (encoded as a big-endian integer)
+            #   contains session id (is generated randomly at the beginning)
+            #   contains challenge token (received during the handshake)
+            #   contains 0x00 0x00 0x00 0x00 as padding (a basic stat request does not include these bytes)
+
+            # construct the request packet
+            req_packet = magic
+            req_packet += stat_packettype
+            req_packet += session_id_bytes
+            req_packet += challenge_token_bytes
+            req_packet += b"\x00\x00\x00\x00"
+
+            # send packet to server
+            sock.sendto(req_packet, (self.address, self.port))
+
+            # receive requested status data
+            raw_res = sock.recv(4096)
+
+            # close the socket
+            sock.close()
+
+        except TimeoutError:
+            return ConnStatus.TIMEOUT
+        except (ConnectionResetError, ConnectionAbortedError):
+            return ConnStatus.UNKNOWN
+        except OSError:
+            return ConnStatus.CONNFAIL
+        finally:
+            sock.close()
+
+        return self.__parse_query_payload(raw_res)
+
+    def __parse_query_payload(self, raw_res) -> ConnStatus:
+        """
+        Helper method for parsing the reponse from a query request.
+
+        See https://wiki.vg/Query for details.
+
+        This implementation does not parse every value returned by the query protocol.
+        """
+        try:
+            self.__extracted_from___parse_query_payload_11(raw_res)
+        except Exception:
+            return ConnStatus.UNKNOWN
+
+        self.online = True
+        self.slp_protocol = SlpProtocols.QUERY
+        return ConnStatus.SUCCESS
+
+    def __extracted_from___parse_query_payload_11(self, raw_res):
+        # remove uneccessary padding
+        res = raw_res[11:]
+
+        # split stats from players
+        raw_stats, raw_players = res.split(b"\x00\x00\x01player_\x00\x00")
+
+        # split stat keys and values into individual elements and remove unnecessary padding
+        stat_list = raw_stats.split(b"\x00")[2:]
+
+        # move keys and values into a dictonary, the keys are also decoded
+        key = True
+        stats = {}
+        for index, key_name in enumerate(stat_list):
+            if key:
+                stats[key_name.decode("utf-8")] = stat_list[index + 1]
+                key = False
+            else:
+                key = True
+
+        # extract motd, the motd is named "hostname" in the Query protocol
+        if "hostname" in stats:
+            self.motd = stats["hostname"].decode("iso_8859_1")
+
+        # the "MOTD" key is used in a basic stats query reponse
+        elif "MOTD" in stats:
+            self.motd = stats["MOTD"].decode("iso_8859_1")
+
+        if self.motd is not None:
+            # remove potential formatting
+            self.stripped_motd = self.motd_strip_formatting(self.motd)
+
+        # extract the servers Minecraft version
+        if "version" in stats:
+            self.version = stats["version"].decode("utf-8")
+
+            # extract list of plugins
+        if "plugins" in stats:
+            raw_plugins = stats["plugins"].decode("utf-8")
+            if raw_plugins != "":
+                # the plugins are separated by " ;"
+                self.plugins = raw_plugins.split(" ;")
+                # there may be information about the server software in the first plugin element
+                # example: ["Paper on 1.19.3: AnExampleMod 7.3", "AnotherExampleMod 4.2", ...]
+                # more information on https://wiki.vg/Query
+                if ":" in self.plugins[0]:  # type: ignore
+                    self.version, self.plugins[0] = self.plugins[0].split(": ")  # type: ignore
+
+        # extract the name of the map the server is running on
+        if "map" in stats:
+            self.map = stats["map"].decode("utf-8")
+
+        if "numplayers" in stats:
+            self.current_players = int(stats["numplayers"])
+            self.max_players = int(stats["maxplayers"])
+
+        # split players (seperated by 0x00)
+        players = raw_players.split(b"\x00")
+
+        # decode players and sort out empty elements
+        self.player_list = [
+            player.decode("utf-8") for player in players[:-2] if player != b""
+        ]
+
+    def json_query(self) -> ConnStatus:
+        """
+        Method for querying a modern (MC Java >= 1.7) server with the SLP protocol.
+        This protocol is based on encoded JSON, see the documentation at wiki.vg below
+        for a full packet description.
+
+        See https://wiki.vg/Server_List_Ping#Current
+        """
+        if self.use_ip_v6:
+            sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        else:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(self.timeout)
+
+        try:
+            self._extracted_from_beta_query_19(sock)
+        except TimeoutError:
+            return ConnStatus.TIMEOUT
+        except OSError:
+            return ConnStatus.CONNFAIL
+
+        # Construct Handshake packet
+        req_data = bytearray([0x00])
+        # Add protocol version. If pinging to determine version, use `-1`
+        req_data += bytearray([0xFF, 0xFF, 0xFF, 0xFF, 0x0F])
+        # Add server address length
+        req_data += self._pack_varint(len(self.refer))
+        # Server address. Encoded with UTF8
+        req_data += bytearray(self.refer, "utf8")
+        # Server port
+        req_data += struct.pack(">H", self.port)
+        # Next packet state (1 for status, 2 for login)
+        req_data += bytearray([0x01])
+
+        # Prepend full packet length
+        req_data = self._pack_varint(len(req_data)) + req_data
+
+        # Now actually send the constructed client request
+        sock.send(req_data)
+
+        # Now send empty "Request" packet
+        # varint len, 0x00
+        sock.send(bytearray([0x01, 0x00]))
+
+        # Do all the receiving in a try-catch, to reduce duplication of error handling
+        try:
+            # Receive answer: full packet length as varint
+            packet_len = self._unpack_varint(sock)
+
+            # Check if full packet length seems acceptable
+            if packet_len < 3:
+                return ConnStatus.UNKNOWN
+
+            # Receive actual packet id
+            packet_id = self._unpack_varint(sock)
+
+            # If we receive a packet with id 0x19, something went wrong.
+            # Usually the payload is JSON text, telling us what exactly.
+            # We could stop here, and display something to the user, as this is not normal
+            # behaviour, maybe a bug somewhere here.
+
+            # Instead I am just going to check for the correct packet id: 0x00
+            if packet_id != 0:
+                return ConnStatus.UNKNOWN
+
+            # Receive & unpack payload length
+            content_len = self._unpack_varint(sock)
+
+            # Receive full payload
+            payload_raw = self._recv_exact(sock, content_len)
+
+        except TimeoutError:
+            return ConnStatus.TIMEOUT
+        except (ConnectionResetError, ConnectionAbortedError):
+            return ConnStatus.UNKNOWN
+        except OSError:
+            return ConnStatus.CONNFAIL
+        finally:
+            sock.close()
+
+        # Set protocol version
+        self.slp_protocol = SlpProtocols.JSON
+
+        # Parse and save to object attributes
+        return self.__parse_json_payload(payload_raw)
+
+    def __parse_json_payload(self, payload_raw: bytes | bytearray) -> ConnStatus:
+        """
+        Helper method for parsing the modern JSON-based SLP protocol.
+        In use for Minecraft Java >= 1.7, see `json_query()` above for details regarding the protocol.
+
+        :param payload_raw: The raw SLP payload, without header and string lenght
+        """
+        try:
+            payload_obj = json.loads(payload_raw.decode("utf8"))
+        except json.JSONDecodeError:
+            return ConnStatus.UNKNOWN
+
+        # Now that we have the status object, set all fields
+        self.version = payload_obj["version"]["name"]
+        self.protocol_version = payload_obj["version"]["protocol"]
+
+        # The motd might be a string directly, not a json object
+        if isinstance(payload_obj.get("description", ""), str):
+            self.motd = payload_obj.get("description", "")
+        else:
+            self.motd = json.dumps(payload_obj["description"])
+        self.stripped_motd = self.motd_strip_formatting(
+            payload_obj.get("description", "")
         )
-        self.italic_font_path = os.path.join(
-            os.path.dirname(__file__), "font", "Italic.ttf"
-        )
-        self.font_size = 40
 
-    def _calculate_dimensions(self, text: str) -> tuple[int, int]:
-        """
-        计算图像的宽度和高度。
-        """
-        # Create a temporary image and draw object for calculating dimensions
-        temp_image = Image.new("RGB", (1, 1))
-        temp_draw = ImageDraw.Draw(temp_image)
-        font = self.get_font()
+        players = payload_obj.get("players", {})
+        self.max_players = players.get("max", -1)
+        self.current_players = players.get("online", -1)
 
-        max_width, total_height = self._calculate_plain_text_dimensions(
-            text, font, temp_draw
-        )
+        # There may be a "sample" field in the "players" object that contains a sample list of online players
+        if "sample" in players:
+            self.player_list = [player["name"] for player in players["sample"]]
 
-        # Add padding to the dimensions
-        width = max_width + 2 * self.padding
-        height = total_height + 2 * self.padding
-        return int(width), int(height)
-
-    def _calculate_plain_text_dimensions(self, text, font, temp_draw):
-        """
-        计算普通文本的尺寸，忽略颜色标记。
-        """
-        # 移除颜色标记
-        plain_text = re.sub(r"\[\#[^\]]*\]", "", text)
-
-        max_width = 0
-        total_height = 0
-        line_height = self.font_size * 1.5
-
-        for line in plain_text.split("\n"):
-            bbox = temp_draw.textbbox((0, 0), line, font=font)
-            width = bbox[2] - bbox[0] + 50
-            max_width = max(max_width, width)
-            total_height += line_height
-
-        return max_width, total_height
-
-    def get_font(
-        self, bold: bool = False, italic: bool = False
-    ) -> ImageFont.FreeTypeFont:
-        """
-        根据指定的样式获取字体。
-
-        :param bold: 是否使用粗体，默认为 False。
-        :param italic: 是否使用斜体，默认为 False。
-        :return: 返回一个 `ImageFont.FreeTypeFont` 对象。
-        """
-        if bold and italic:
-            return ImageFont.truetype(self.bold_and_italic_font_path, self.font_size)
-        elif bold:
-            return ImageFont.truetype(self.bold_font_path, self.font_size)
-        elif italic:
-            return ImageFont.truetype(self.italic_font_path, self.font_size)
-        return ImageFont.truetype(self.font_path, self.font_size)
-
-    async def draw_text_with_style(self) -> "ColoredTextImage":
-        """
-        使用指定样式绘制文本。
-
-        :param text: 需要绘制的文本字符串。
-        """
-        text = self.text
-        width, height = self._calculate_dimensions(text)
-        self.image = Image.new("RGB", (width, height), self.background_color)  # type: ignore
-        self.draw = ImageDraw.Draw(self.image)
-        await self._parse_style(text)
-        return self
-
-    async def _parse_style(self, text: str):
-        """
-        解析文本中的样式。
-        """
-        styles = {
-            "bold": False,
-            "italic": False,
-            "underline": False,
-            "strikethrough": False,
-        }
-        current_color = (0, 0, 0)
-        line_height = self.font_size * 1.5
-        x_offset = 50
-        y_offset = 0
-
-        fonts_cache = {}
-
-        def get_font(
-            bold: bool = False, italic: bool = False
-        ) -> ImageFont.FreeTypeFont:
-            key = (bold, italic)
-            if key not in fonts_cache:
-                fonts_cache[key] = self.get_font(bold, italic)
-            return fonts_cache[key]
-
-        for line in text.split("\n"):
-            i = 0
-            while i < len(line):
-                if line[i] == "[":
-                    end_tag = line.find("]", i)
-                    if end_tag == -1:
-                        break
-                    tag = line[i : end_tag + 1]
-                    if tag == "[#BOLD]":
-                        styles["bold"] = True
-                    elif tag == "[#ITALIC]":
-                        styles["italic"] = True
-                    elif tag == "[#UNDERLINE]":
-                        styles["underline"] = True
-                    elif tag == "[#STRIKETHROUGH]":
-                        styles["strikethrough"] = True
-                    elif tag == "[#RESET]":
-                        styles = {key: False for key in styles}
-                        current_color = (0, 0, 0)
-                    elif tag.startswith("[#") and len(tag) > 2:
-                        hex_color = tag[2:-1].upper()
-                        if len(hex_color) == 3:
-                            hex_color = "".join([c * 2 for c in hex_color])
-                        try:
-                            current_color = tuple(
-                                int(hex_color[j : j + 2], 16) for j in (0, 2, 4)
-                            )
-                        except ValueError:
-                            current_color = (0, 0, 0)
-                    i = end_tag + 1
-                    continue
-
-                char = line[i]
-                font_mod = get_font(styles["bold"], styles["italic"])
-                bbox = self.draw.textbbox((x_offset, y_offset), char, font=font_mod)
-                width = bbox[2] - bbox[0]
-
-                self.draw.text(
-                    (x_offset, y_offset), char, fill=current_color, font=font_mod
+        try:
+            self.favicon_b64 = payload_obj["favicon"]
+            if self.favicon_b64:
+                self.favicon = str(
+                    base64.b64decode(self.favicon_b64.split("base64,")[1]), "ISO-8859–1"
                 )
+        except KeyError:
+            self.favicon_b64 = None
+            self.favicon = None
 
-                if styles["underline"]:
-                    underline_y = y_offset + self.font_size
-                    self.draw.line(
-                        (x_offset, underline_y, x_offset + width, underline_y),
-                        fill=current_color,
-                        width=1,
-                    )
+        # If we got here, everything is in order.
+        self.online = True
+        return ConnStatus.SUCCESS
 
-                if styles["strikethrough"]:
-                    strikethrough_y = y_offset + self.font_size / 2
-                    self.draw.line(
-                        (x_offset, strikethrough_y, x_offset + width, strikethrough_y),
-                        fill=current_color,
-                        width=1,
-                    )
+    def _unpack_varint(self, sock: socket.socket) -> int:
+        """Small helper method for unpacking an int from an varint (streamed from socket)."""
+        data = 0
+        for i in range(5):
+            ordinal = sock.recv(1)
 
-                x_offset += width
-                i += 1
-            y_offset += line_height
-            x_offset = 50
+            if len(ordinal) == 0:
+                break
 
-    def save(self, filename: str) -> None:
+            byte = ord(ordinal)
+            data |= (byte & 0x7F) << 7 * i
+
+            if not byte & 0x80:
+                break
+
+        return data
+
+    def _pack_varint(self, data) -> bytes:
+        """Small helper method for packing a varint from an int."""
+        ordinal = b""
+
+        while True:
+            byte = data & 0x7F
+            data >>= 7
+            ordinal += struct.pack("B", byte | (0x80 if data > 0 else 0))
+
+            if data == 0:
+                break
+
+        return ordinal
+
+    def extended_legacy_query(self) -> ConnStatus:
         """
-        将当前图像保存到文件。
+        Minecraft 1.6 SLP query, extended legacy ping protocol.
+        All modern servers are currently backwards compatible with this protocol.
 
-        :param filename: 文件名，包括路径和扩展名。
+        See https://wiki.vg/Server_List_Ping#1.6
+        :return:
         """
-        self.image.save(filename, format="PNG")
+        if self.use_ip_v6:
+            sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        else:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(self.timeout)
 
-    def pic2bytes(self) -> bytes:
-        """
-        将当前图像转换为字节流。
+        try:
+            self._extracted_from_beta_query_19(sock)
+        except TimeoutError:
+            return ConnStatus.TIMEOUT
+        except OSError:
+            return ConnStatus.CONNFAIL
 
-        :return: 返回一个包含图像数据的字节流。
+        # Send 0xFE as packet identifier,
+        # 0x01 as ping packet content
+        # 0xFA as packet identifier for a plugin message
+        # 0x00 0x0B as strlen of following string
+        req_data = bytearray([0xFE, 0x01, 0xFA, 0x00, 0x0B])
+        # the string 'MC|PingHost' as UTF-16BE encoded string
+        req_data += bytearray("MC|PingHost", "utf-16-be")
+        # 0xXX 0xXX byte count of rest of data, 7+len(serverhostname), as short
+        req_data += struct.pack(">h", 7 + (len(self.refer) * 2))
+        # 0xXX [legacy] protocol version (before netty rewrite)
+        # Used here: 74 (MC 1.6.2)
+        req_data += bytearray([0x49])
+        # strlen of serverhostname (big-endian short)
+        req_data += struct.pack(">h", len(self.refer))
+        # the hostname of the server
+        req_data += bytearray(self.refer, "utf-16-be")
+        # port of the server, as int (4 byte)
+        req_data += struct.pack(">i", self.port)
+
+        # Now send the contructed client requests
+        sock.send(req_data)
+
+        try:
+            # Receive answer packet id (1 byte)
+            packet_id = self._recv_exact(sock, 1)
+
+            # Check packet id (should be "kick packet 0xFF")
+            if packet_id[0] != 0xFF:
+                return ConnStatus.UNKNOWN
+
+            # Receive payload lengh (signed big-endian short; 2 byte)
+            raw_payload_len = self._recv_exact(sock, 2)
+
+            # Extract payload length
+            # Might be empty, if the server keeps the connection open but doesn't send anything
+            content_len = struct.unpack(">h", raw_payload_len)[0]
+
+            # Check if payload length is acceptable
+            if content_len < 3:
+                return ConnStatus.UNKNOWN
+
+            # Receive full payload and close socket
+            payload_raw = self._recv_exact(sock, content_len * 2)
+
+        except TimeoutError:
+            return ConnStatus.TIMEOUT
+        except (ConnectionResetError, ConnectionAbortedError, struct.error):
+            return ConnStatus.UNKNOWN
+        except OSError:
+            return ConnStatus.CONNFAIL
+        finally:
+            sock.close()
+
+        # Set protocol version
+        self.slp_protocol = SlpProtocols.EXTENDED_LEGACY
+
+        # Parse and save to object attributes
+        return self.__parse_legacy_payload(payload_raw)
+
+    def legacy_query(self) -> ConnStatus:
         """
-        byte_io = io.BytesIO()
-        self.image.save(byte_io, format="PNG")
-        byte_io.seek(0)
-        return byte_io.getvalue()
+        Minecraft 1.4-1.5 SLP query, server response contains more info than beta SLP
+
+        See https://wiki.vg/Server_List_Ping#1.4_to_1.5
+
+        :return: ConnStatus
+        """
+        if self.use_ip_v6:
+            sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        else:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(self.timeout)
+
+        try:
+            self._extracted_from_beta_query_19(sock)
+        except TimeoutError:
+            return ConnStatus.TIMEOUT
+        except OSError:
+            return ConnStatus.CONNFAIL
+
+        # Send 0xFE 0x01 as packet id
+        sock.send(bytearray([0xFE, 0x01]))
+
+        # Receive answer packet id (1 byte) and payload lengh (signed big-endian short; 2 byte)
+        try:
+            raw_header = self._recv_exact(sock, 3)
+        except TimeoutError:
+            return ConnStatus.TIMEOUT
+        except (ConnectionAbortedError, ConnectionResetError):
+            return ConnStatus.UNKNOWN
+        except OSError:
+            return ConnStatus.CONNFAIL
+
+        # Extract payload length
+        # Might be empty, if the server keeps the connection open but doesn't send anything
+        try:
+            content_len = struct.unpack(">xh", raw_header)[0]
+        except struct.error:
+            return ConnStatus.UNKNOWN
+
+        # Receive full payload and close socket
+        payload_raw = bytearray(self._recv_exact(sock, content_len * 2))
+        sock.close()
+
+        # Set protocol version
+        self.slp_protocol = SlpProtocols.LEGACY
+
+        # Parse and save to object attributes
+        return self.__parse_legacy_payload(payload_raw)
+
+    def __parse_legacy_payload(self, payload_raw: bytearray | bytes) -> ConnStatus:
+        """
+        Internal helper method for parsing the legacy SLP payload (legacy and extended legacy).
+
+        :param payload_raw: The extracted legacy SLP payload as bytearray/bytes
+        """
+        # According to wiki.vg, beta, legacy and extended legacy use UTF-16BE as "payload" encoding
+        payload_str = payload_raw.decode("utf-16-be")
+
+        # This "payload" contains six fields delimited by a NUL character:
+        # - a fixed prefix '§1'
+        # - the protocol version
+        # - the server version
+        # - the MOTD
+        # - the online player count
+        # - the max player count
+        payload_list = payload_str.split("\x00")
+
+        # Check for count of string parts, expected is 6 for this protocol version
+        if len(payload_list) != 6:
+            return ConnStatus.UNKNOWN
+
+        # - a fixed prefix '§1'
+        # - the protocol version
+        self.protocol_version = int(payload_list[1][1:]) if payload_list[1] else 0
+        # - the server version
+        self.version = payload_list[2]
+        # - the MOTD
+        self.motd = payload_list[3]
+        self.stripped_motd = self.motd_strip_formatting(payload_list[3])
+        # - the online player count
+        self.current_players = int(payload_list[4])
+        # - the max player count
+        self.max_players = int(payload_list[5])
+
+        # If we got here, everything is in order
+        self.online = True
+        return ConnStatus.SUCCESS
+
+    def beta_query(self) -> ConnStatus:
+        """
+        Minecraft Beta 1.8 to Release 1.3 SLP protocol
+        See https://wiki.vg/Server_List_Ping#Beta_1.8_to_1.3
+
+        :return: ConnStatus
+        """
+        if self.use_ip_v6:
+            sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+        else:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(self.timeout)
+
+        try:
+            self._extracted_from_beta_query_19(sock)
+        except TimeoutError:
+            return ConnStatus.TIMEOUT
+        except OSError:
+            return ConnStatus.CONNFAIL
+
+        # Send 0xFE as packet id
+        sock.send(bytearray([0xFE]))
+
+        # Receive answer packet id (1 byte) and payload lengh (signed big-endian short; 2 byte)
+        try:
+            raw_header = self._recv_exact(sock, 3)
+        except TimeoutError:
+            return ConnStatus.TIMEOUT
+        except (ConnectionResetError, ConnectionAbortedError):
+            return ConnStatus.UNKNOWN
+        except OSError:
+            return ConnStatus.CONNFAIL
+
+        # Extract payload length
+        # Might be empty, if the server keeps the connection open but doesn't send anything
+        try:
+            content_len = struct.unpack(">xh", raw_header)[0]
+        except struct.error:
+            return ConnStatus.UNKNOWN
+
+        # Receive full payload and close socket
+        payload_raw = bytearray(self._recv_exact(sock, content_len * 2))
+        sock.close()
+
+        # Set protocol version
+        self.slp_protocol = SlpProtocols.BETA
+
+        # According to wiki.vg, beta, legacy and extended legacy use UTF-16BE as "payload" encoding
+        payload_str = payload_raw.decode("utf-16-be")
+        # This "payload" contains three values:
+        # The MOTD, the max player count, and the online player count
+        payload_list = payload_str.split("§")
+
+        # Check for count of string parts, expected is 3 for this protocol version
+        # Note: We could check here if the list has the len() one, as that is most probably an error message.
+        # e.g. ['Protocol error']
+        if len(payload_list) < 3:
+            return ConnStatus.UNKNOWN
+
+        # The last value is the max player count
+        self.max_players = int(payload_list[-1])
+        # The second(-to-last) value is the online player count
+        self.current_players = int(payload_list[-2])
+        # The first value it the server MOTD
+        # This could contain '§' itself, thats the reason for the join here
+        self.motd = "§".join(payload_list[:-2])
+        self.stripped_motd = self.motd_strip_formatting("§".join(payload_list[:-2]))
+
+        # Set general version, as the protocol doesn't contain the server version
+        self.version = ">=1.8b/1.3"
+
+        # If we got here, everything is in order
+        self.online = True
+
+        return ConnStatus.SUCCESS
+
+    def _extracted_from_beta_query_19(self, sock):
+        start_time = perf_counter()
+        sock.connect((self.address, self.port))
+        self.latency = round((perf_counter() - start_time) * 1000)
+
+    @staticmethod
+    def _recv_exact(sock: socket.socket, size: int) -> bytearray:
+        """
+        Helper function for receiving a specific amount of data. Works around the problems of `socket.recv`.
+        Throws a ConnectionAbortedError if the connection was closed while waiting for data.
+
+        :param sock: Open socket to receive data from
+        :param size: Amount of bytes of data to receive
+        :return: bytearray with the received data
+        """
+        data = bytearray()
+
+        while len(data) < size:
+            if temp_data := bytearray(sock.recv(size - len(data))):
+                data += temp_data
+
+            else:
+                raise ConnectionAbortedError
+
+        return data
