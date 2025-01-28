@@ -91,8 +91,8 @@ plugins = ["nonebot_plugin_mccheck"]
 
 ## 🖼️ Test screenshot
 
-v0.1.42
-![v0.1.37](https://github.com/user-attachments/assets/9962fc63-c004-4c79-b271-7e9156e65945)
+v0.1.43
+![Image_31020983743694.png](https://github.com/user-attachments/assets/2db47c9a-7ba1-4ce7-a31c-b65f6e848308)
 ![Image](https://github.com/user-attachments/assets/2ca058f5-2341-425d-8033-63dad8d43fbf)
 
 ### 🎈 Special Notes
