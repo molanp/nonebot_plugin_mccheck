@@ -121,14 +121,13 @@ Add the required configuration in the following table to the `.env` file of the 
 | Configuration Item | Required | Default Value | Description |
 |:-----:|:----:|:----:|:----:|
 | `MCC__LANGUAGE` | False | `zh-cn` | Languages used by the plugin to render images<br>Available languages: [`zh-cn`,`zh-tw`,`en`] |
-| `MCC__TYPE` | False | `0` | The type of message the plugin sends (`0` for HTML, `1` for image, `2` for text) |
+| `MCC__TYPE` | False | `0` | The type of message the plugin sends (`0` for HTML, `1` for text) |
 
 ## 🎲 Comparison of message types
 
 | Type | Special Styles | Favicon | Fully colored underline/strikethrough | Full Unicode font support |
 |:-----:|:-----:|:-----:|:-----:|:-----:|
 | Text | ❌ | ⭕ | ❌ | ⭕ |
-| Picture | ⭕ | ⭕ | ⭕ | ❌ |
 | HTML | ⭕ | ⭕ | ⭕ | ⭕ |
 
 ## 🎉 Usage
