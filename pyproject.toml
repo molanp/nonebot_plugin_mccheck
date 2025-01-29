@@ -4,7 +4,7 @@ version = "0.1.45"
 description = "Minecraft服务器状态查询的nonebot插件，支持IPv6/Minecraft server status query plugin for nonebot, IPv6 supported"
 readme = "README.md"
 requires-python = ">=3.9"
-authors = ["molanp <luotian233@foxmail.com>"]
+authors = ["molanp <molanpp@outlook.com>"]
 license = "GPL-3.0"
 homepage = "https://github.com/molanp/nonebot_plugin_mccheck"
 repository = "https://github.com/molanp/nonebot_plugin_mccheck"
