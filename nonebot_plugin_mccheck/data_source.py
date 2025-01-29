@@ -197,7 +197,7 @@ class MineStat:
         """
 
         """Whether to use ip_v6 for DNS resolution"""
-        self.use_ip_v6: bool | None = use_ipv6
+        self.use_ipv6: bool | None = use_ipv6
 
         """The source of the IP in the sent packet"""
         if refer is None:
@@ -379,7 +379,7 @@ class MineStat:
         )
 
         # Create socket with type DGRAM (for UDP)
-        if self.use_ip_v6:
+        if self.use_ipv6:
             sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         else:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -523,7 +523,7 @@ class MineStat:
         #   receive status data
 
         # Create UDP socket and set timeout
-        if self.use_ip_v6:
+        if self.use_ipv6:
             sock = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         else:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -686,7 +686,7 @@ class MineStat:
 
         See https://wiki.vg/Server_List_Ping#Current
         """
-        if self.use_ip_v6:
+        if self.use_ipv6:
             sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         else:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -850,7 +850,7 @@ class MineStat:
         See https://wiki.vg/Server_List_Ping#1.6
         :return:
         """
-        if self.use_ip_v6:
+        if self.use_ipv6:
             sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         else:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -930,7 +930,7 @@ class MineStat:
 
         :return: ConnStatus
         """
-        if self.use_ip_v6:
+        if self.use_ipv6:
             sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         else:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -1019,7 +1019,7 @@ class MineStat:
 
         :return: ConnStatus
         """
-        if self.use_ip_v6:
+        if self.use_ipv6:
             sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
         else:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
