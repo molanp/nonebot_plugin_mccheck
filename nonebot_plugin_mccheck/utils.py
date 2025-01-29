@@ -10,7 +10,6 @@ import dns.asyncresolver
 import dns.name
 import idna
 from nonebot import require, logger
-from PIL import Image, ImageDraw, ImageFont
 import ujson
 
 from .configs import VERSION, lang, lang_data, message_type
