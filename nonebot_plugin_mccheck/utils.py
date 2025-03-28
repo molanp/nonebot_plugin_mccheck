@@ -6,7 +6,8 @@ import re
 import traceback
 
 import dns.asyncresolver
-import dns.name
+import dns.resolver
+import dns.exception
 import idna
 from nonebot import require, logger
 import ujson
@@ -397,16 +398,19 @@ async def get_origin_address(
 
     resolver = dns.asyncresolver.Resolver()
     resolver.timeout = 10
-    resolver.retries = 3
+    resolver.retries = 3  # type: ignore
 
     async def resolve_srv():
         with contextlib.suppress(
-            dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.exception.Timeout
+            dns.resolver.NoAnswer,
+            dns.resolver.NXDOMAIN,
+            dns.exception.Timeout,
+            dns.resolver.NoNameservers,
         ):
             srv_response = await resolver.resolve(f"_minecraft._tcp.{domain}", "SRV")
             for rdata in srv_response:
-                srv_address = str(rdata.target).rstrip(".")
-                srv_port = rdata.port
+                srv_address = str(rdata.target).rstrip(".")  # type: ignore
+                srv_port = rdata.port  # type: ignore
                 ip_type = await get_ip_type(srv_address)
                 if ip_type == "Domain":
                     srv_address_ = await get_origin_address(
@@ -437,20 +441,26 @@ async def get_origin_address(
 
     async def resolve_aaaa():
         with contextlib.suppress(
-            dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.exception.Timeout
+            dns.resolver.NoAnswer,
+            dns.resolver.NXDOMAIN,
+            dns.exception.Timeout,
+            dns.resolver.NoNameservers,
         ):
             response = await resolver.resolve(domain, "AAAA")
             for rdata in response:
-                data.append((str(rdata.address), ip_port, "IPv6", domain))
+                data.append((str(rdata.address), ip_port, "IPv6", domain)) # type: ignore
                 break
 
     async def resolve_a():
         with contextlib.suppress(
-            dns.resolver.NoAnswer, dns.resolver.NXDOMAIN, dns.exception.Timeout
+            dns.resolver.NoAnswer,
+            dns.resolver.NXDOMAIN,
+            dns.exception.Timeout,
+            dns.resolver.NoNameservers,
         ):
             response = await resolver.resolve(domain, "A")
             for rdata in response:
-                data.append((str(rdata.address), ip_port, "IPv4", domain))
+                data.append((str(rdata.address), ip_port, "IPv4", domain))  # type: ignore
                 break
 
     if is_resolve_srv:
@@ -529,7 +539,7 @@ async def parse_motd2html(json_data: str | None) -> str | None:
         "§u": ('<span style="color:#9A5CC6;">', "</span>"),  # material amethyst
     }
 
-    async def parse_extra(extra, styles=[]):
+    async def parse_extra(extra, styles=[]) -> str:
         result = ""
         if isinstance(extra, dict) and "extra" in extra:
             for key in extra:

@@ -201,9 +201,9 @@ class MineStat:
 
         """The source of the IP in the sent packet"""
         if refer is None:
-           self.refer = address
+            self.refer = address
         else:
-           self.refer = refer
+            self.refer = refer
 
         self.address: str = address
         """hostname or IP address of the Minecraft server"""
@@ -213,9 +213,9 @@ class MineStat:
             autoport = True
             if query_protocol is SlpProtocols.BEDROCK_RAKNET:
                 if use_ipv6:
-                   port = self.DEFAULT_BEDROCK_PORT_V6
+                    port = self.DEFAULT_BEDROCK_PORT_V6
                 else:
-                   port = self.DEFAULT_BEDROCK_PORT_V4
+                    port = self.DEFAULT_BEDROCK_PORT_V4
             else:
                 port = self.DEFAULT_TCP_PORT
 
@@ -294,9 +294,9 @@ class MineStat:
         # Minecraft Bedrock/Pocket/Education Edition (MCPE/MCEE)
         if autoport and not self.port:
             if use_ipv6:
-               self.port = self.DEFAULT_BEDROCK_PORT_V6
+                self.port = self.DEFAULT_BEDROCK_PORT_V6
             else:
-               self.port = self.DEFAULT_BEDROCK_PORT_V4
+                self.port = self.DEFAULT_BEDROCK_PORT_V4
 
         result = self.bedrock_raknet_query()
         self.connection_status = result
@@ -702,7 +702,7 @@ class MineStat:
         # Construct Handshake packet
         req_data = bytearray([0x00])
         # Add protocol version. If pinging to determine version, use `25565`
-        req_data += bytearray([0xdd, 0xc7, 0x01])
+        req_data += bytearray([0xDD, 0xC7, 0x01])
         # Add server address length
         req_data += self._pack_varint(len(self.refer))
         # Server address. Encoded with UTF8
@@ -777,8 +777,8 @@ class MineStat:
             return ConnStatus.UNKNOWN
 
         # Now that we have the status object, set all fields
-        self.version = payload_obj["version"]["name"]
-        self.protocol_version = payload_obj["version"]["protocol"]
+        self.version = payload_obj.get("version", {}).get("name")
+        self.protocol_version = payload_obj.get("version", {}).get("protocol", -1)
 
         # The motd might be a string directly, not a json object
         if isinstance(payload_obj.get("description", ""), str):
@@ -1058,7 +1058,7 @@ class MineStat:
         except struct.error:
             return ConnStatus.UNKNOWN
         try:
-        # Receive full payload and close socket
+            # Receive full payload and close socket
             payload_raw = bytearray(self._recv_exact(sock, content_len * 2))
         except TimeoutError:
             return ConnStatus.TIMEOUT
