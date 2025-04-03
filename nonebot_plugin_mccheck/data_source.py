@@ -385,13 +385,6 @@ class MineStat:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         sock.settimeout(self.timeout)
 
-        try:
-            self._extracted_from_beta_query_19(sock)
-        except TimeoutError:
-            return ConnStatus.TIMEOUT
-        except OSError:
-            return ConnStatus.CONNFAIL
-
         # Construct the `Unconnected_Ping` packet
         # Packet ID - 0x01
         req_data = bytearray([0x01])
@@ -401,8 +394,6 @@ class MineStat:
         req_data += RAKNET_MAGIC
         # Client GUID - as signed long (64-bit) LE-encoded
         req_data += struct.pack("<q", 0x02)
-
-        sock.send(req_data)
 
         # Do all the receiving in a try-catch, to reduce duplication of error handling
 
@@ -414,6 +405,10 @@ class MineStat:
         # short - Server ID string length
         # string - Server ID string
         try:
+            start_time = perf_counter()  # 记录发送时间
+            sock.connect((self.address, self.port))
+            sock.send(req_data)
+
             response_buffer, response_addr = sock.recvfrom(1024)
             response_stream = io.BytesIO(response_buffer)
 
@@ -449,6 +444,8 @@ class MineStat:
             return ConnStatus.CONNFAIL
         finally:
             sock.close()
+            elapsed_time = perf_counter() - start_time
+            self.latency = round(elapsed_time * 1000)  # 设置延迟
 
         # Set protocol version
         self.slp_protocol = SlpProtocols.BEDROCK_RAKNET
