@@ -406,6 +406,7 @@ async def get_origin_address(
             dns.resolver.NXDOMAIN,
             dns.exception.Timeout,
             dns.resolver.NoNameservers,
+            IndexError,
         ):
             srv_response = await resolver.resolve(f"_minecraft._tcp.{domain}", "SRV")
             for rdata in srv_response:
