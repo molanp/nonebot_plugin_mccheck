@@ -6,8 +6,8 @@ import re
 import traceback
 
 import dns.asyncresolver
-import dns.resolver
 import dns.exception
+import dns.resolver
 import idna
 from nonebot import require, logger
 import ujson
@@ -16,8 +16,7 @@ from .configs import VERSION, lang, lang_data, message_type
 from .data_source import ConnStatus, MineStat, SlpProtocols
 
 require("nonebot_plugin_alconna")
-from nonebot_plugin_alconna import Image as NImage
-from nonebot_plugin_alconna import Text
+from nonebot_plugin_alconna import Image, Text
 
 
 async def handle_exception(e):
@@ -78,8 +77,8 @@ async def build_result(ms, address, type=0):
             template_name="default.html",
             templates={"data": result},
         )
-        return NImage(raw=pic)
-    elif type == 1:
+        return Image(raw=pic)
+    else:
         motd_part = f"\n{lang_data[lang]['motd']}{ms.stripped_motd}"
         version_part = f"\n{lang_data[lang]['version']}{ms.version}"
 
@@ -111,7 +110,7 @@ async def build_result(ms, address, type=0):
             [
                 Text(result),
                 Text("\nFavicon:"),
-                NImage(raw=base64.b64decode(ms.favicon_b64.split(",")[1])),
+                Image(raw=base64.b64decode(ms.favicon_b64.split(",")[1])),
             ]
             if ms.favicon is not None
             else [Text(result)]
@@ -388,7 +387,7 @@ async def get_origin_address(
     - List[Tuple[str, int, str, str]]: 一个列表，包含一个元组，元组包含三个元素：
       - 第一个元素是解析后的地址（字符串形式）。
       - 第二个元素是地址的端口号（整数形式。
-      - 第三个元素是地址的类型（"IPv4" 或 "IPv6" 或 "SRV" 或 "SRV-IPv4" 或 "SRV-IPv6"）。
+      - 第三个元素是地址的类型（"IPv4" 或 "IPv6" 或 "SRV" 或 "SRV-IPv4" 或 "SRV-IPv6"）
       - 第四个元素是解析地址的来源域名或IP
     """
     ip_type = await get_ip_type(domain)
@@ -423,7 +422,12 @@ async def get_origin_address(
                         f"SRV-{srv_address_[0][2]}",
                         srv_address_[0][3],
                     )
-                    # data.extend([(addr, port, f"SRV-{ip_type}", refer) for addr, port, ip_type, refer in srv_address_])
+                    # data.extend(
+                    #     [
+                    #         (addr, port, f"SRV-{ip_type}", refer)
+                    #         for addr, port, ip_type, refer in srv_address_
+                    #     ]
+                    # )
                 else:
                     srv_data = (
                         srv_address,
@@ -449,7 +453,7 @@ async def get_origin_address(
         ):
             response = await resolver.resolve(domain, "AAAA")
             for rdata in response:
-                data.append((str(rdata.address), ip_port, "IPv6", domain)) # type: ignore
+                data.append((str(rdata.address), ip_port, "IPv6", domain))  # type: ignore
                 break
 
     async def resolve_a():
@@ -472,17 +476,17 @@ async def get_origin_address(
     return data
 
 
-async def parse_motd2html(json_data: str | None) -> str | None:
+async def parse_motd2html(data: str | None) -> str | None:
     """
     解析MOTD数据并转换为带有自定义颜色的HTML字符串。
 
     参数:
-    - json_data (str|None): MOTD数据。
+    - data (str|None): MOTD数据。
 
     返回:
     - str | None: 带有自定义颜色的HTML字符串。
     """
-    if json_data is None:
+    if data is None:
         return None
 
     standard_color_map = {
@@ -526,8 +530,7 @@ async def parse_motd2html(json_data: str | None) -> str | None:
         "§g": ('<span style="color:#DDD605;">', "</span>"),  # minecoin gold
         "§h": ('<span style="color:#E3D4D1;">', "</span>"),  # material quartz
         "§i": ('<span style="color:#CECACA;">', "</span>"),  # material iron
-        # material netherite
-        "§j": ('<span style="color:#443A3B;">', "</span>"),
+        "§j": ('<span style="color:#443A3B;">', "</span>"),  # material netherite
         "§l": ("<b style='color:{};'>", "</b>"),  # bold
         "§m": ("<s style='color:{};'>", "</s>"),  # strikethrough
         "§n": ("<u style='color:{};'>", "</u>"),  # underline
@@ -540,17 +543,54 @@ async def parse_motd2html(json_data: str | None) -> str | None:
         "§u": ('<span style="color:#9A5CC6;">', "</span>"),  # material amethyst
     }
 
-    async def parse_extra(extra, styles=[]) -> str:
+    async def parse_text_motd(text: str) -> str:
         result = ""
-        if isinstance(extra, dict) and "extra" in extra:
-            for key in extra:
+        i = 0
+        styles = []
+        while i < len(text):
+            if text[i] == "§":
+                style_code = text[i : i + 2]
+                if style_code in standard_color_map:
+                    open_tag, close_tag = standard_color_map[style_code]
+
+                    # 如果是重置，则清空样式栈
+                    if open_tag == "</b></i></u></s>":
+                        # 清空样式栈并关闭所有打开的样式
+                        for tag in styles:
+                            result += tag
+                        styles.clear()
+                    else:
+                        styles.append(close_tag)
+                        result += open_tag
+                    i += 2
+                    continue
+            # 处理换行符
+            if text[i : i + 2] == "\n":
+                result += "<br>"
+                i += 2
+                continue
+            result += text[i]
+            i += 1
+
+        # 在字符串末尾关闭所有打开的样式
+        for tag in styles:
+            result += tag
+
+        return result
+
+    async def parse_json_motd(json, styles=[]) -> str:
+        result = ""
+        if isinstance(json, dict) and "extra" in json:
+            for key in json:
                 if key == "extra":
-                    result += await parse_extra(extra[key], styles)
+                    result += await parse_json_motd(json[key], styles)
                 elif key == "text":
-                    result += await parse_extra(extra[key], styles)
-        elif isinstance(extra, dict):
-            color = extra.get("color", "")
-            text = extra.get("text", "")
+                    result += await parse_json_motd(json[key], styles)
+        elif isinstance(json, dict):
+            color = json.get("color", "")
+            text = json.get("text", "")
+            if "§" in text:
+                text = await parse_text_motd(text)
 
             # 将颜色转换为 HTML 的 font 标签
             if color.startswith("#"):
@@ -567,66 +607,34 @@ async def parse_motd2html(json_data: str | None) -> str | None:
                 color_code = color_code[1] if color_code else "#FFFFFF"
             # 更新样式栈
             open_tag, close_tag = color_html_str
-            if extra.get("bold") is True:
+            if json.get("bold") is True:
                 open_tag_, close_tag_ = standard_color_map["bold"]
                 open_tag += open_tag_.format(color_code)
                 close_tag = close_tag_ + close_tag
-            if extra.get("italic") is True:
+            if json.get("italic") is True:
                 open_tag_, close_tag_ = standard_color_map["italic"]
                 open_tag += open_tag_.format(color_code)
                 close_tag = close_tag_ + close_tag
-            if extra.get("underline") is True:
+            if json.get("underline") is True:
                 open_tag_, close_tag_ = standard_color_map["underline"]
                 open_tag += open_tag_.format(color_code)
                 close_tag = close_tag_ + close_tag
-            if extra.get("strikethrough") is True:
+            if json.get("strikethrough") is True:
                 open_tag_, close_tag_ = standard_color_map["strikethrough"]
                 open_tag += open_tag_.format(color_code)
                 close_tag = close_tag_ + close_tag
             styles.append(close_tag)
             result += open_tag + text + close_tag
-        elif isinstance(extra, list):
-            for item in extra:
-                result += await parse_extra(item, styles)
+        elif isinstance(json, list):
+            for item in json:
+                result += await parse_json_motd(item, styles)
         else:
-            result += str(extra)
+            result += str(json)
         return result.replace("\n", "<br>")
 
     try:
-        json_data = ujson.loads(json_data)
+        data = ujson.loads(data)
     except ujson.JSONDecodeError:
-        result = ""
-        i = 0
-        styles = []
-        while i < len(json_data):
-            if json_data[i] == "§":
-                style_code = json_data[i : i + 2]
-                if style_code in standard_color_map:
-                    open_tag, close_tag = standard_color_map[style_code]
+        return await parse_text_motd(data)
 
-                    # 如果是重置，则清空样式栈
-                    if open_tag == "</b></i></u></s>":
-                        # 清空样式栈并关闭所有打开的样式
-                        for tag in styles:
-                            result += tag
-                        styles.clear()
-                    else:
-                        styles.append(close_tag)
-                        result += open_tag
-                    i += 2
-                    continue
-            # 处理换行符
-            if json_data[i : i + 2] == "\n":
-                result += "<br>"
-                i += 2
-                continue
-            result += json_data[i]
-            i += 1
-
-        # 在字符串末尾关闭所有打开的样式
-        for tag in styles:
-            result += tag
-
-        return result
-
-    return await parse_extra(json_data)
+    return await parse_json_motd(data)
