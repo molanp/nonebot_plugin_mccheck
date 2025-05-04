@@ -1,6 +1,5 @@
 from nonebot import require
 from nonebot.plugin import PluginMetadata
-from nonebot_plugin_uninfo import Session, UniSession
 
 from .config import Config
 from .configs import lang, lang_data
@@ -14,8 +13,10 @@ from .utils import (
 )
 
 require("nonebot_plugin_alconna")
+require("nonebot_plugin_uninfo")
 from arclet.alconna import Alconna, Args
 from nonebot_plugin_alconna import Arparma, Text, UniMessage, on_alconna
+from nonebot_plugin_uninfo import Session, UniSession
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
