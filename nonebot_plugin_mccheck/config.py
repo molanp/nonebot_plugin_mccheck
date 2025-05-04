@@ -1,9 +1,8 @@
-from pydantic import Field, BaseModel
 from nonebot.plugin import get_plugin_config
+from pydantic import BaseModel, Field
 
 
 class ScopedConfig(BaseModel):
-
     language: str = Field(default="zh-cn")
     """插件渲染图片所使用的语言"""
     type: int = Field(default=0)
