@@ -1,22 +1,25 @@
-from .configs import lang_data, lang
-from .utils import (
-    is_validity_address,
-    get_message_list,
-    parse_host,
-    change_language_to,
-    handle_exception,
-)
-from nonebot.plugin import PluginMetadata
-from .config import Config
 from nonebot import require
+from nonebot.plugin import PluginMetadata
+from nonebot_plugin_uninfo import Session, UniSession
+
+from .config import Config
+from .configs import lang, lang_data
+from .utils import (
+    change_language_to,
+    get_message_list,
+    handle_exception,
+    is_qbot,
+    is_validity_address,
+    parse_host,
+)
 
 require("nonebot_plugin_alconna")
-from nonebot_plugin_alconna import on_alconna, Match, UniMessage, Text  # type: ignore # noqa: E402
-from arclet.alconna import Args, Alconna  # type: ignore # noqa: E402
+from arclet.alconna import Alconna, Args
+from nonebot_plugin_alconna import Arparma, Text, UniMessage, on_alconna
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
-    description="Minecraft服务器状态查询，支持IPv6/Minecraft server status query, IPv6 supported",
+    description="Minecraft服务器状态查询，支持IPv6/Minecraft server status query, IPv6 supported",  # noqa: E501
     type="application",
     homepage="https://github.com/molanp/nonebot_plugin_mccheck",
     config=Config,
@@ -65,36 +68,41 @@ lang_list = on_alconna(
     block=True,
 )
 
+
 @check.handle()
-async def _(host: Match[str]):
-    if host.available:
-        check.set_path_arg("host", host.result)
-
-
-@check.got_path("host", prompt=lang_data[lang]["where_ip"])
-async def handle_check(host: str):
-    address, port = await parse_host(host)
+async def _(p: Arparma, session: Session = UniSession()):
+    if not p.find("host"):
+        await check.finish(Text(f"{lang_data[lang]['where_ip']}"), reply_to=True)
+    address, port = await parse_host(p.query("host"))
 
     if not str(port).isdigit() or not (0 <= int(port) <= 65535):
-        await check.finish(Text(f'{lang_data[lang]["where_port"]}'), reply_to=True)
+        await check.finish(Text(f"{lang_data[lang]['where_port']}"), reply_to=True)
 
     if await is_validity_address(address):
-        await get_info(address, port)
+        await get_info(address, port, session)
         return
-    await check.finish(Text(f'{lang_data[lang]["where_ip"]}'), reply_to=True)
 
-async def get_info(ip, port):
+
+async def get_info(ip, port, session):
     global ms
 
     try:
         message_list = await get_message_list(ip, port, 3)
         if any(isinstance(i, list) for i in message_list):
             for sublist in message_list:
-                await check.send(UniMessage(sublist), reply_to=True)
+                if is_qbot(session):
+                    for m in sublist:
+                        await check.send(UniMessage(m), reply_to=True)
+                else:
+                    await check.send(UniMessage(sublist), reply_to=True)
+        elif is_qbot(session):
+            for m in message_list:
+                await check.send(UniMessage(m), reply_to=True)
         else:
             await check.send(UniMessage(message_list), reply_to=True)
     except BaseException as e:
         await check.send(await handle_exception(e), reply_to=True)
+
 
 @lang_change.handle()
 async def _(language: str):
@@ -102,6 +110,8 @@ async def _(language: str):
         await lang_change.send(Text(await change_language_to(language)), reply_to=True)
     else:
         await lang_change.send(Text("Language?"), reply_to=True)
+
+
 @lang_now.handle()
 async def _():
     await lang_now.send(Text(f"Language: {lang}."), reply_to=True)
