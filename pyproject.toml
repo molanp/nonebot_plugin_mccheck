@@ -9,7 +9,7 @@ license = "GPL-3.0"
 homepage = "https://github.com/molanp/nonebot_plugin_mccheck"
 repository = "https://github.com/molanp/nonebot_plugin_mccheck"
 include = ["nonebot_plugin_mccheck/**/*"]
-keywords = ["nonebot", "nonebot2", "minecraft", "i18n", "inquire", "checker", "server"]
+keywords = ["nonebot", "nonebot2", "minecraft", "i18n", "plugin", "server"]
 
 [tool.poetry.dependencies]
 nonebot-plugin-alconna = ">=0.48.0"
@@ -22,8 +22,3 @@ ujson = ">=5.0.0"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.optional-dependencies]
-adapters = [
-    "nonebot-adapter-onebot>=2.4.1",
-]
