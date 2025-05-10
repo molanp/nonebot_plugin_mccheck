@@ -1,6 +1,5 @@
 from nonebot import require
-from nonebot.plugin import PluginMetadata
-
+from nonebot.plugin import PluginMetadata, inherit_supported_adapters
 from .config import Config
 from .configs import lang, lang_data
 from .utils import (
@@ -23,6 +22,9 @@ __plugin_meta__ = PluginMetadata(
     description="Minecraft服务器状态查询，支持IPv6/Minecraft server status query, IPv6 supported",  # noqa: E501
     type="application",
     homepage="https://github.com/molanp/nonebot_plugin_mccheck",
+    supported_adapters=inherit_supported_adapters(
+        "nonebot_plugin_alconna", "nonebot_plugin_uninfo"
+    ),
     config=Config,
     usage="""
     Minecraft服务器状态查询，支持IPv6
