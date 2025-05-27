@@ -135,19 +135,15 @@ async def get_mc(
     返回:
     - list: 包含Java版和Bedrock版服务器信息的列表。
     """
-    loop = asyncio.get_event_loop()
     if ip_type.startswith("SRV"):
         return [
-            await loop.run_in_executor(
-                None, get_java, ip, port, ip_type, refer, timeout
-            )
+            await asyncio.to_thread(get_java, ip, port, ip_type, refer, timeout)
         ]
-    return [
-        await loop.run_in_executor(None, get_java, ip, port, ip_type, refer, timeout),
-        await loop.run_in_executor(
-            None, get_bedrock, ip, port, ip_type, refer, timeout
-        ),
-    ]
+
+    return await asyncio.gather(
+        asyncio.to_thread(get_java, ip, port, ip_type, refer, timeout),
+        asyncio.to_thread(get_bedrock, ip, port, ip_type, refer, timeout),
+    )
 
 
 async def get_message_list(ip: str, port: int, timeout: int = 5) -> list[Text]:
