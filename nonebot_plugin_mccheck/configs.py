@@ -15,4 +15,4 @@ def readInfo(file: str) -> dict:
 message_type = plugin_config.type
 lang = plugin_config.language
 lang_data = readInfo("language.json")
-VERSION = "0.2.0"
+VERSION = "0.2.2"
