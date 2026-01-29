@@ -1,33 +1,29 @@
 import itertools
 
-from nonebot import require
-from nonebot.plugin import PluginMetadata, inherit_supported_adapters
-from .config import Config
+from nonebot.plugin import PluginMetadata
+from nonebot_plugin_alconna import (
+    Alconna,
+    Args,
+    CommandMeta,
+    Match,
+    Text,
+    UniMessage,
+    on_alconna,
+)
+from nonebot_plugin_uninfo import Uninfo
+
 from .configs import lang, lang_data
 from .utils import (
     change_language_to,
     get_message_list,
     handle_exception,
     is_qbot,
-    is_validity_address,
-    parse_host,
+    valid_urlparse,
 )
-
-require("nonebot_plugin_alconna")
-require("nonebot_plugin_uninfo")
-from arclet.alconna import Alconna, Args, CommandMeta
-from nonebot_plugin_alconna import Match, Text, UniMessage, on_alconna
-from nonebot_plugin_uninfo import Uninfo
 
 __plugin_meta__ = PluginMetadata(
     name="Minecraft查服",
     description="Minecraft服务器状态查询，支持IPv6",
-    type="application",
-    homepage="https://github.com/molanp/nonebot_plugin_mccheck",
-    supported_adapters=inherit_supported_adapters(
-        "nonebot_plugin_alconna", "nonebot_plugin_uninfo"
-    ),
-    config=Config,
     usage="""
     Minecraft服务器状态查询，支持IPv6
     用法：
@@ -41,7 +37,6 @@ __plugin_meta__ = PluginMetadata(
         lang_now
         lang_list
     """.strip(),
-    extra={"author": "molanp <luotian233@foxmail.com>"},
 )
 
 check = on_alconna(
@@ -78,21 +73,15 @@ lang_list = on_alconna(
 async def _(host: Match[str], session: Uninfo):
     if not host.available:
         await check.finish(Text(f"{lang_data[lang]['where_ip']}"), reply_to=True)
-    address, port = await parse_host(host.result)
-
-    if not str(port).isdigit() or not (0 <= int(port) <= 65535):
-        await check.finish(Text(f"{lang_data[lang]['where_port']}"), reply_to=True)
-
-    if is_validity_address(address):
-        await get_info(address, port, session)
-        return
-
-
-async def get_info(ip, port, session):
-    global ms
-
     try:
-        message_list = await get_message_list(ip, port, 3)
+        address, port = valid_urlparse(host.result)
+    except ValueError:
+        await check.finish(Text(f"{lang_data[lang]['where_ip']}"), reply_to=True)
+
+    if port and not (0 < port <= 65535):
+        await check.finish(Text(f"{lang_data[lang]['where_port']}"), reply_to=True)
+    try:
+        message_list = await get_message_list(address, port)
         if is_qbot(session):
             for m in message_list:
                 await check.send(UniMessage(m), reply_to=True)
