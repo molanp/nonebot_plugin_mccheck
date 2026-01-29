@@ -19,7 +19,9 @@
       <div class="content">
         <label> {{ data["lang"]["version"] }}{{ data["version"] }} </label>
         <label> {{ data["lang"]["motd"] }}{{ data["motd"]|safe }} </label>
-        <label> {{ data["lang"]["protocol_version"] }}{{ data["protocol_version"]}} </label>
+        <label>
+          {{ data["lang"]["protocol_version"] }}{{ data["protocol_version"]}}
+        </label>
         <label> {{ data["lang"]["address"] }}{{ data["address"] }} </label>
         <label> {{ data["lang"]["delay"] }}{{ data["delay"]}} </label>
         {% if data["gamemode"] %}
@@ -33,7 +35,7 @@
         {% endif %}
       </div>
       <div class="watermark">
-        zhenxun_plugin_mccheck v{{ data["VERSION"] }} by molanp.
+        nonebot_plugin_mccheck v{{ data["VERSION"] }} by molanp.
       </div>
     </div>
     <script>
