@@ -216,7 +216,7 @@ def is_qbot(session: Uninfo) -> bool:
     return session.scope == SupportScope.qq_api
 
 
-def parse_motd2html(data: str) -> str:
+def parse_motd2html(data: str | dict) -> str:
     """
     解析MOTD数据并转换为带有自定义颜色的HTML字符串。
 
