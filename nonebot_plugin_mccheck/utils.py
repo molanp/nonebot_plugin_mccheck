@@ -54,7 +54,7 @@ async def build_result(
     """
     favicon = getattr(ms, "icon", None)
     delay = round(ms.latency)
-    version = f"{ms.version.name} " + getattr(ms, "map_name", "")
+    version = f"{ms.version.name} " + (getattr(ms, "map_name", None) or "")
     protocol_version = ms.version.protocol
     gamemode = getattr(ms, "gamemode", None)
     players = f"{ms.players.online}/{ms.players.max}"
