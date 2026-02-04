@@ -28,4 +28,4 @@ def readInfo(file: str) -> dict:
 message_type = config.type
 lang = config.language
 lang_data = readInfo("language.json")
-VERSION = "0.3.1"
+VERSION = "0.3.2"
