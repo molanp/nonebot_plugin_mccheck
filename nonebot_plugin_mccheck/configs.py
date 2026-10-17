@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 
 import json
 from nonebot.plugin import get_plugin_config
@@ -21,11 +21,11 @@ config: ScopedConfig = get_plugin_config(Config).mcc
 
 
 def readInfo(file: str) -> dict:
-    with open(os.path.join(os.path.dirname(__file__), file), encoding="utf-8") as f:
+    with open(Path(__file__).parent / file, encoding="utf-8") as f:
         return json.loads((f.read()).strip())
 
 
 message_type = config.type
 lang = config.language
 lang_data = readInfo("language.json")
-VERSION = "0.3.4"
+VERSION = "0.4.0"
